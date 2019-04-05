@@ -6961,7 +6961,7 @@ Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, b
     # define sampling Period (in seconds)
     # sampling_period <- 4.08 # OPCTsam/60 (60 --> interval == 1 minute. This is the integration time from Marco (see Grafana))
     sampling_period <- bins_OPC$OPCTsam/60  # OPCTsam/60 (60 --> interval == 1 minute)
-    # sampling_period <- bins_OPC$OPCVol/60  # OPCVol/60 (60 --> interval == 1 minute)
+    
     # calculate Dry diameters (used to calulate the volume of each particle in each Bin) using the GF(RH)  (D_dry = D_wet/GH)
     nbin.next <- paste0("Bin", as.numeric(sub(pattern = "Bin",replacement = "",n.bins_OPC)) +1 )
     Bin_mean_wet <- as.vector(( t(bins_diameters[nbin.next]) + t(bins_diameters[n.bins_OPC]))/2)
@@ -6969,8 +6969,10 @@ Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, b
     # modification of diameters using the growing factor
     RH <- bins_OPC$Relative_humidity
     
-   # browser()
+    # browser()
     
+
+    # run this only for the "DRY" diameters
 if (!(is.null(K))) {
     
     # calculate the growing factor for all the Relative Humidity values (k is a constant value depending type of particle - type of sampling site)
@@ -6994,16 +6996,21 @@ if (!(is.null(K))) {
     
     # multiply bin volumes by their bin weight
     bins_vol_dry <- as.data.frame(mapply(`*`, bins_volume_dry[, n.bins_OPC], bins_weight[,n.bins_OPC]))
-    # multiply all counts (by time-stamp) by the "dry" volume if each bin (!!! missing "bins_weight[,n.bins_OPC]")
+    # multiply all raw counts (by time-stamp) by the "dry" volume of each bin (!!! missing "bins_weight[,n.bins_OPC]")
     V_OPC <-  mapply(`*`, bins_OPC[,n.bins_OPC]/sampling_period, bins_vol_dry)
-}
+    
+    # run this only for the "WET" diameters
+} else if ((is.null(K))) {
     
 
+    # multiply all raw counts (by time-stamp) by the "wet" volume of each bin
     V_OPC <-  apply(bins_OPC[,n.bins_OPC]/sampling_period, MARGIN = 1,
                             function(n.row) return(n.row * bins_weight[,n.bins_OPC] * bins_volume[, n.bins_OPC] ))
+
     # make a data frame
     V_OPC <-  dplyr::bind_rows(V_OPC)
-
+}
+    
     # make a data frame
     V_OPC <-  as.data.frame(V_OPC)
 
@@ -7012,7 +7019,6 @@ if (!(is.null(K))) {
         V_OPC[i , unlist(Bins_to_invalidate[i]) ]  <- NaN
     }
     
-    # browser()
 
     Bin_mean_wet <- cbind.data.frame(n.bins_OPC,
                                      Bin_mean_wet)
@@ -7049,8 +7055,6 @@ if (!(is.null(K))) {
         dplyr::group_by(diameters) %>%
         dplyr::summarise(counts = mean(counts, na.rm = T))
     
-    
-    
     V_OPC <- as.data.frame(V_OPC)
     V_OPC <- V_OPC %>%
         gather("bins", "volume")
@@ -7076,9 +7080,8 @@ if (!(is.null(K))) {
     # attach mean diameter for each Bin (wet)
     V_OPC <- V_OPC %>%
         left_join(Bin_mean_wet, by = c("bins"))
-        
     
-    # only select counts > 0
+
     Volume_OPC_all <- V_OPC %>%
         dplyr::select(diameters,
                       volume,
@@ -7095,7 +7098,6 @@ if (!(is.null(K))) {
         dplyr::group_by(mean_diameters) %>%
         dplyr::summarise(volume = mean(volume, na.rm = T),
                          weight = mean(weight, na.rm = T))
-    
     
     
     # browser()
@@ -7126,15 +7128,22 @@ if (!(is.null(K))) {
 
 # prediction of OPC values based of fitting model from Reference data
 # return a dataframe with corrected diamters and counts in log10 units
-Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NULL) {
+Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NULL, GF = NULL) {
     
     # counts_OPC contains diamters and counts in micrometers
     # diameter correction with the density
     counts_OPC$diameters <- counts_OPC$diameters/sqrt(density)
     
     # browser()
-    DataXY <- data.frame(x = log10(counts_OPC$diameters),
+    if (!(is.null(GF))) {
+        # x are the DRY diameters!!! (D_dry = D_wet/GF)
+        DataXY <- data.frame(x = log10(counts_OPC$diameters/GF),
                          y = log10(counts_OPC$counts))
+    } else if ((is.null(GF))) {
+        # x are the WET diameters!!!
+        DataXY <- data.frame(x = log10(counts_OPC$diameters),
+                             y = log10(counts_OPC$counts))
+    }
     
     predict_OPC <- predict(Model.i.Gam$Model, DataXY)
     predict_OPC <- data.frame(DataXY$x, predict_OPC)
@@ -7148,11 +7157,17 @@ Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NUL
 
 
 # # prediction of OPC Volume Value using the result of the Model
-Density_Vol_predict <- function(Volume_OPC, Mod_type, density, Model.i.Vol = NULL) {
+Density_Vol_predict <- function(Volume_OPC, Mod_type, density, Model.i.Vol = NULL, GF = NULL) {
 
-    # browser()
+if (!(is.null(GF))) {
+    # x are the DRY diameters!!! (D_dry = D_wet/GF)
+    DataXY <- data.frame(x = log10(Volume_OPC$diameters/GF),  
+                         y = log10(Volume_OPC$volume)) 
+} else if ((is.null(GF))) {
+    # x are the WET diameters!!!
     DataXY <- data.frame(x = log10(Volume_OPC$diameters),
-                         y = log10(Volume_OPC$volume)) # this is the wet Volume!!!
+                         y = log10(Volume_OPC$volume)) 
+   }
 
     # predict Volume at the OPC bins according to the reference
     predict_OPC_Vol <- predict(Model.i.Vol$Model, DataXY)
@@ -7163,7 +7178,8 @@ Density_Vol_predict <- function(Volume_OPC, Mod_type, density, Model.i.Vol = NUL
     predict_OPC_Vol$predict_Vol <- 10^predict_OPC_Vol$predict_Vol
 
     return(predict_OPC_Vol = predict_OPC_Vol)
-}
+}  
+    
 
 
 # plot predicted value of the OPC sensor

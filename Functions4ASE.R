@@ -4739,43 +4739,43 @@ Etalonnage <- function(x, s_x, y, s_y, AxisLabelX, AxisLabelY, Title, Marker , C
             Range <- sapply(DataXY[,Int], range, na.rm = TRUE, finite = TRUE)[2,] - sapply(DataXY[,Int], range, na.rm = TRUE, finite = TRUE)[1,]
             cat("Range of values on x and y axis\n")
             print(Range, quote = FALSE)
-            digitround <- round(log10(1/Range))+2 # +1 gives too many digits? no it is fine
+            digitround <- round(log10(1/Range)) + 2 # +1 gives too many digits? no it is fine
         }
         
         # Calculating the limits of the graph
         if (is.null(lim)) {
             if (isTRUE(XY_same)) {
                 if (is.null(s_y) || any(s_y == 0) || all(is.na(s_y))) {
-                    Xlim <- c(round(min(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"]),digits=digitround[1]), 
-                              round(max(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"]),digits=digitround[1]))
+                    Xlim <- c(round(min(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"]),digits = digitround[1]), 
+                              round(max(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"]),digits = digitround[1]))
                     Ylim <- Xlim
                 } else {
-                    Xlim <- c(round(min(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"] - DataXY$s_y),digits=digitround[1]),
-                              round(max(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"] + DataXY$s_y),digits=digitround[1]))
+                    Xlim <- c(round(min(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"] - DataXY$s_y),digits = digitround[1]),
+                              round(max(DataXY[is.finite(DataXY$x),"x"], DataXY[is.finite(DataXY$y),"y"] + DataXY$s_y),digits = digitround[1]))
                     Ylim <- Xlim
                 }
             } else {
                 if (is.null(s_y)|| any(s_y == 0) || all(is.na(s_y))) {
-                    Ylim <- c(round(min(DataXY$y, na.rm = TRUE),digits=digitround[2]),
-                              round(max(DataXY[is.finite(DataXY$y),"y"], na.rm=TRUE),digits=digitround[2]))
+                    Ylim <- c(round(min(DataXY$y, na.rm = TRUE),digits = digitround[2]),
+                              round(max(DataXY[is.finite(DataXY$y),"y"], na.rm=TRUE),digits = digitround[2]))
                 } else {
                     #if ((max(DataXY$y + DataXY$s_y)-min(DataXY$y - DataXY$s_y)) < 1) {
                     #  Ylim <- c((min(DataXY$y - DataXY$s_y)),(max(DataXY$y + DataXY$s_y)))
                     #} else {
-                    Ylim <- c(round(min(DataXY$y - DataXY$s_y),digits=digitround[2]),
-                              round(max(DataXY$y + DataXY$s_y),digits=digitround[2]))
+                    Ylim <- c(round(min(DataXY$y - DataXY$s_y),digits = digitround[2]),
+                              round(max(DataXY$y + DataXY$s_y),digits = digitround[2]))
                     #}
                 }
                 if (class(DataXY$x) == "POSIXct") {
                     Xlim <- c(min(DataXY$x),max(DataXY$x))
                 } else {
-                    Xlim <- c(round(min(DataXY$x),digits=digitround[1]),
-                              round(max(DataXY$x),digits=digitround[1]))
+                    Xlim <- c(round(min(DataXY$x),digits = digitround[1]),
+                              round(max(DataXY$x),digits = digitround[1]))
                 }
             }
         } else {
-            Xlim <- c(round(min(lim[,1]),digits=digitround[1]),round(max(lim[,1]),digits=digitround[1]))
-            Ylim <- c(round(min(lim[,2]),digits=digitround[2]),round(max(lim[,2]),digits=digitround[2]))
+            Xlim <- c(round(min(lim[,1]),digits = digitround[1]),round(max(lim[,1]),digits = digitround[1]))
+            Ylim <- c(round(min(lim[,2]),digits = digitround[2]),round(max(lim[,2]),digits = digitround[2]))
         }
         # specifying ticks and grid
         if (is.null(steps)) {
@@ -4795,27 +4795,17 @@ Etalonnage <- function(x, s_x, y, s_y, AxisLabelX, AxisLabelY, Title, Marker , C
               ,col = Couleur
               ,type = ligne
               ,pch = Marker
-              # ,xaxp = c(min(Xlim), max(Xlim), stepsX)
-              # ,yaxp = c(min(Ylim), max(Ylim), stepsY)
-              # ,xaxt = PlotAxis
-              # ,yaxt = PlotAxis
               ,xaxt = "n"
               ,yaxt = "n"
               
         )
         axis(side = 1, at = pretty(x,stepsX))
         axis(side = 2, at = pretty(y,stepsY))
-        if (!is.null(s_y) && all(!is.na(s_y))) {
-            if (all(s_y != 0)) {
-                # hack: we draw arrows but with flat "arrowheads"
-                arrows(DataXY$x, DataXY$y - DataXY$s_y , DataXY$x, DataXY$y + DataXY$s_y, length = 0.05, angle = 90, code = 3)
-            }
-        } 
+        if (!is.null(s_y) && all(s_y != 0)) {
+            # hack: we draw arrows but with flat "arrowheads"
+            arrows(DataXY$x, DataXY$y - DataXY$s_y , DataXY$x, DataXY$y + DataXY$s_y, length=0.05, angle=90, code=3)
+        }
         
-        # par(xaxp = c(min(Xlim), max(Xlim), stepsX), 
-        #     yaxp = c(min(Ylim), max(Ylim), stepsY)
-        #     )
-        #grid (NULL,NULL, lty = 2, col = "grey")
         abline(h=pretty(y,stepsY), v =pretty(x,stepsX), lty = 2, col = "grey")
         title (main = Title, outer = TRUE, line = -1)
         
