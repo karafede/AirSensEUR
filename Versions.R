@@ -6,15 +6,13 @@
 #                    and new variables for existing dates can be added when using the "csv" download type. The time average that takes cpu is only carried out if the date interval of 
 #                    time series is different than the requested "Averaging time in min" in tab "Time-shield" or if the date in the reference data files do not fall on full hours 
 #                    (00:00 or 00:0010). Correction of the transformation of spherical reference coordinates into decimal degrees.
-#              N91 - In function CONFIG() of Functions4ASE, if any config files is missiont (sever, filtering ...) an error message is dispalyed and the App wil crash.
+#              N91 - In function CONFIG() of Functions4ASE, if any config files is missing (server, filtering ...) an error message is displayed and the App wil crash.
 #                    The App will not try to create the config file anymore
-#              N92 - Download of reference data is now possible using the protocol of data download of the a_i_p company (Austrian company)
-#              N93 - password are now hidden in NavBar menu sensor and reference download (Influx, a_i_p...)
+#              N92 - Download of reference data is now possible using the protocol of data download of the a_i_p company (Austrian company used in Austria and Germany + JRC EMP station)
+#              N93 - Passwords are now hidden in SideBar Layout and reference download (Influx, a_i_p...)
 #              E44 - A bug was corrected that resulted in a general crash of the App when creating a new ASE config file for a new box with empty SETTime file.
-#              E19 - input$Sens.rm.Invalid plotted and saved and some mistakes in sensor names in Plot.Invalid.Sens
-#              E21 - BUG in create new, wrong Old_General_dir. Corrected
-#             
-#                    
+#              E19 - Plot and saving when input$Sens.rm.Invalid. Some mistakes in sensor names in Plot.Invalid.Sens. Solved.
+#              E21 - BUG in create new, wrong Old_General_dir. Corrected.
 # 
 #  ----#TO BE DONE  : ----
 # BUG CORRECTIONS
@@ -25,6 +23,7 @@
 #             E26 - It seems that the detection of invalid data is not performed automatically when the file ind.Invalid.file does not exist or that it is performed after the detection of outliers 
 #                   and hence not applied to DF$General. You can check on the mainTabPanel PlotFiltering - Invalid data appear.
 #             E36 - Some of the Spin Loaders keep on spining after updating of the plots. Others do not realized when they receive the updated plots and do not display them. Have a look.
+#             E45 - The time zone used in the mainTabPanel "Plot Filtering" - "Invalid" - "Table" seems to use the local time zone instaed of the data series ime zone ("UTC") when discarding values.
 #              
 # NEW FEATURES needed: ----
 #              N2 - Calibration with linear.robust: add RMSE on statterplot ...

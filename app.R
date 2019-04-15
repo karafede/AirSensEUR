@@ -1647,7 +1647,7 @@ server <- function(input, output, session) {
             
             output$uicoord.ref      <- renderUI({
                 textInput(inputId = "coord.ref", 
-                          label   = "Latitude and longitude of the reference station, format: decimal degrees or d\'m\'s.s\'E\",d\'m\'s.s\'N\"", 
+                          label   = "Longitude and latitude of the reference station, format: decimal degrees or d\'m\'s.s\'E\",d\'m\'s.s\'N\"", 
                           value   = Config()[[1]]$coord.ref
                 )
             })
@@ -1782,9 +1782,9 @@ server <- function(input, output, session) {
                                     
                                     updateTextInput(session = session, 
                                                     inputId = "file1",  
-                                                    value = file.choose(),
-                                                    multi = FALSE,
-                                                    index = 1
+                                                    value = file.choose()#,
+                                                    #multi = FALSE,
+                                                    #index = 1
                                     )
                                 }
                             } else {
@@ -2959,64 +2959,105 @@ server <- function(input, output, session) {
         on.exit(progress$close())
         progress$set(message = "[shiny, REFDATA()] INFO, Loading Reference data", value = 0.5)
         
+        # Initial coordinates of reference station
+        Coord.Ref <- input$coord.ref
+        
         # Checking if there are coordinates for the reference data separated by a comma
-        if (!length(input$coord.ref) > 0 || is.null(input$coord.ref) || input$coord.ref == "" || !grepl(patter = ",", x = input$coord.ref)) {
+        repeat {
             
-            my_message <- paste0("[shiny, REFDATA()] ERROR, the coordinates of the reference station are missing\n")
+        } (!length(Coord.Ref) > 0 || is.null(Coord.Ref) || Coord.Ref == "" || !grepl(pattern = paste0(c(","), collapse = "|"), x = Coord.Ref)) {
+            
+            my_message <- paste0("[shiny, REFDATA()] ERROR, the coordinates of the reference station are incorrect\n
+                                 type longitude and latitude, format: decimal degrees,decimal degrees  or d\'m\'s.s\'E\",d\'m\'s.s\'N\" \n")
             cat(my_message)
             shinyalert(
-                title = "ERROR missing coordinates",
-                text = my_message,
-                closeOnEsc = TRUE,
-                closeOnClickOutside = TRUE,
-                html = FALSE,
-                type = "error",
+                title               = "ERROR missing coordinates",
+                text                = my_message,
+                closeOnEsc          = FALSE,
+                closeOnClickOutside = FALSE,
+                html                = FALSE,
+                type                = "input",
+                callbackR = function(x) { # feed back of coordinates into the ui
+                    browser()
+                    
+                    # checking if the separator is ","
+                    if (any(grepl(pattern =  ",", x = x))) {
+                        
+                        # Checking is the coordinates are in spherical or decimal format, projection to OpenStreet map
+                        if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = x))) {
+                            
+                            # extract spherical coordinates
+                            Ref.coord_LON  <- unlist(strsplit(x = x, split = ","))[1]
+                            Ref.coord_LAT  <- unlist(strsplit(x = x, split = ","))[2]
+                            # transform spherical coordinates to decimal degrees for later projection
+                            Ref.coord_d    <- OSMscale::degree(Ref.coord_LAT, Ref.coord_LON, digits = 5)
+                            # Project the spherical coordinates in Mercator web WS84 of OPenStreet view - This is not needed, map correct without projection
+                            #Ref.coord_p    <- OSMscale::projectPoints(Ref.coord_d[1], Ref.coord_d[2], to=OSMscale::pll())
+                            Ref.coord_LAT  <- Ref.coord_d[1,1]
+                            Ref.coord_LON  <- Ref.coord_d[1,2]
+                        
+                        } else {
+                            
+                            Ref.coord_LON <- as.numeric(unlist(strsplit(x = x, split = ","))[1])
+                            Ref.coord_LAT <- as.numeric(unlist(strsplit(x = x, split = ","))[2])
+                        }
+                        
+                        # updating coordinates of reference station
+                        Coord.Ref <- paste0(Ref.coord_LON, ", ", Ref.coord_LAT)
+                        updateTextInput(session = session, 
+                                        inputId = "coord.ref",  
+                                        value   = Coord.Ref
+                        )
+                    }},
                 showConfirmButton = TRUE,
                 showCancelButton  = FALSE,
                 confirmButtonText = "OK",
                 confirmButtonCol  = "#AEDEF4",
+                cancelButtonText = "Cancel",
                 timer             = 0,
                 imageUrl          = "",
                 animation         = FALSE)
             
+            click("Down_Ref")
+            return()
         } 
-            
-            # Checking if there are several ftp url
-            if (any(grepl(pattern = ",", x = input$urlref))) urlref = unlist(strsplit(gsub(pattern= " ","",x = input$urlref), split = ",")  ) else urlref = gsub(pattern = " ","",x = input$urlref)
-            C <- REF(DownloadSensor     = DownloadSensor(), 
-                     AirsensEur.name    = input$AirsensEur.name, 
-                     DisqueFieldtestDir = (DisqueFieldtestDir()),
-                     UserMins           = as.numeric(input$UserMins), 
-                     Down.Ref           = input$Down.Ref, 
-                     ref.tzone          = input$ref.tzone,
-                     InfluxData         = INFLUX()[[1]], 
-                     SOSData            = SOS_T()[[1]],
-                     Reference.name     = input$Reference.name,
-                     urlref             = urlref,
-                     sens2ref           = Config()[[2]],
-                     FTPMode            = input$FTPMode, 
-                     Ref.SOS.name       = input$Ref.SOS.name, 
-                     RefSOSname         = input$RefSOSname,
-                     RefSOSDateIN       = as.Date(input$RefDateDownload[1], format = "%Y-%m-%d"),
-                     RefSOSDateEND      = as.Date(input$RefDateDownload[2], format = "%Y-%m-%d"),
-                     Ref__a_i_p__name         = input$Ref__a_i_p__name, 
-                     User__a_i_p__            = input$User__a_i_p__, 
-                     Pass__a_i_p__            = input$Pass__a_i_p__, 
-                     Ref__a_i_p__Organisation = input$Ref__a_i_p__Organisation, 
-                     Ref__a_i_p__Station      = input$Ref__a_i_p__Station, 
-                     Ref__a_i_p__Pollutants   = input$Ref__a_i_p__Pollutants, 
-                     Ref__a_i_p__DateIN       = as.Date(input$Ref__a_i_p__Date[1], format = "%Y-%m-%d"),
-                     Ref__a_i_p__DateEND      = as.Date(input$Ref__a_i_p__Date[2], format = "%Y-%m-%d"),
-                     csvFile            = input$file1,
-                     csvFile.sep        = input$sep,
-                     csvFile.quote      = input$quote,
-                     Coord.Ref          = input$coord.ref,
-                     Ref.Type           = input$Ref.Type
-            )
-            progress$set(message = "[shiny, REFDATA()] INFO, Loading Reference data", value = 1)
-            return(C)
-            #RefData       <- REFDATA()[[3]]
-            # variables in <- REFDATA()[[2]]
+        
+        # Checking if there are several ftp url
+        if (any(grepl(pattern = ",", x = input$urlref))) urlref = unlist(strsplit(gsub(pattern = " ","",x = input$urlref), split = ",")  ) else urlref = gsub(pattern = " ","",x = input$urlref)
+        C <- REF(DownloadSensor     = DownloadSensor(), 
+                 AirsensEur.name    = input$AirsensEur.name, 
+                 DisqueFieldtestDir = (DisqueFieldtestDir()),
+                 UserMins           = as.numeric(input$UserMins), 
+                 Down.Ref           = input$Down.Ref, 
+                 ref.tzone          = input$ref.tzone,
+                 InfluxData         = INFLUX()[[1]], 
+                 SOSData            = SOS_T()[[1]],
+                 Reference.name     = input$Reference.name,
+                 urlref             = urlref,
+                 sens2ref           = Config()[[2]],
+                 FTPMode            = input$FTPMode, 
+                 Ref.SOS.name       = input$Ref.SOS.name, 
+                 RefSOSname         = input$RefSOSname,
+                 RefSOSDateIN       = as.Date(input$RefDateDownload[1], format = "%Y-%m-%d"),
+                 RefSOSDateEND      = as.Date(input$RefDateDownload[2], format = "%Y-%m-%d"),
+                 Ref__a_i_p__name         = input$Ref__a_i_p__name, 
+                 User__a_i_p__            = input$User__a_i_p__, 
+                 Pass__a_i_p__            = input$Pass__a_i_p__, 
+                 Ref__a_i_p__Organisation = input$Ref__a_i_p__Organisation, 
+                 Ref__a_i_p__Station      = input$Ref__a_i_p__Station, 
+                 Ref__a_i_p__Pollutants   = input$Ref__a_i_p__Pollutants, 
+                 Ref__a_i_p__DateIN       = as.Date(input$Ref__a_i_p__Date[1], format = "%Y-%m-%d"),
+                 Ref__a_i_p__DateEND      = as.Date(input$Ref__a_i_p__Date[2], format = "%Y-%m-%d"),
+                 csvFile            = input$file1,
+                 csvFile.sep        = input$sep,
+                 csvFile.quote      = input$quote,
+                 Coord.Ref          = Coord.Ref,
+                 Ref.Type           = input$Ref.Type
+        )
+        progress$set(message = "[shiny, REFDATA()] INFO, Loading Reference data", value = 1)
+        return(C)
+        #RefData       <- REFDATA()[[3]]
+        # variables in <- REFDATA()[[2]]
     })
     observeEvent(input$Down_Ref, {
         str(REFDATA())
@@ -7162,7 +7203,7 @@ server <- function(input, output, session) {
                     Ref.coord_LAT <- as.numeric(unlist(strsplit(x = CalSet()$Coord.Ref, split = " "))[2])
                 }
             } else {
-                my_message <- paste0("[shiny, pointsCal()] ERROR, the coordinates of the reference station are missing.\n")
+                my_message <- paste0("[shiny, pointsCal()] ERROR, the coordinates of the reference station are incorrect\n")
                 cat(my_message)
                 shinyalert(
                     title = "ERROR missing data",
@@ -8577,7 +8618,7 @@ server <- function(input, output, session) {
                     Ref.coord_LAT <- as.numeric(unlist(strsplit(x = CalSet()$Coord.Ref, split = " "))[2])
                 }
             } else {
-                my_message <- paste0("[shiny, PointsExtrap()] ERROR, the coordinates of the reference station are missing.\n")
+                my_message <- paste0("[shiny, PointsExtrap()] ERROR, the coordinates of the reference station are incorrect\n")
                 cat(my_message)
                 shinyalert(
                     title = "ERROR missing data",

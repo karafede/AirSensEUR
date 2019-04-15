@@ -2847,7 +2847,7 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                                 Reference.i$Ref.Long  <- Ref.coord_d[1,2]
                                 
                             } else {
-                                
+                                #browser()
                                 Reference.i$Ref.Long <- as.numeric(long)
                                 Reference.i$Ref.Lat  <- as.numeric(lat)
                             }

@@ -6854,7 +6854,7 @@ f_dcounts_ddp <- function(n.bins_OPC, bins_OPC, bins_diameters, Counts_units ) {
 
 
 Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, bins_diameters, Sensor_dates = NULL, 
-                                    Dist_Ref.full = NULL, Counts_units ="dN/dlogDp", Vol_units = "ml", K = NULL) {
+                                    Dist_Ref.full = NULL, Counts_units = NULL, Vol_units = "ml", K = NULL) {
     # Counts_units:     Character, default is counts per ml
     # General.df        numerical counts for OPC data for each Bin (Bin0, Bin1.....Bin23)
     # output is a list of bins_OPC: character vector of diameter names (Bins)
@@ -6869,7 +6869,9 @@ Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, b
     if (!is.null(Sensor_dates))  General.df <- General.df %>% filter(date <= Sensor_dates)
     
     # make all fields as numeric for OPCN3
-    
+
+   # browser()
+if (Counts_units =="dN/dlogDp") {
     # browser()
     General.df[,grep("Bin",names(General.df))] <- sapply(names(General.df[,grep("Bin",names(General.df))]), function(x) { as.numeric(General.df[,x])})
     
@@ -6969,9 +6971,6 @@ Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, b
     # modification of diameters using the growing factor
     RH <- bins_OPC$Relative_humidity
     
-    # browser()
-    
-
     # run this only for the "DRY" diameters
 if (!(is.null(K))) {
     
@@ -7030,6 +7029,7 @@ if (!(is.null(K))) {
     # Bins to keep
     Bin.cap <- names(cap[which(cap <= 0.40)])
     V_OPC <- V_OPC[, Bin.cap]
+    
 
     # transpose data by bin 
     bins_diameters <- gather(bins_diameters, "bins", "diameters")
@@ -7054,6 +7054,8 @@ if (!(is.null(K))) {
     counts_OPC <- counts_OPC %>%
         dplyr::group_by(diameters) %>%
         dplyr::summarise(counts = mean(counts, na.rm = T))
+    
+    
     
     V_OPC <- as.data.frame(V_OPC)
     V_OPC <- V_OPC %>%
@@ -7123,6 +7125,35 @@ if (!(is.null(K))) {
                 counts_OPC = counts_OPC, Volume_OPC = Volume_OPC, Volume_OPC_mean = Volume_OPC_mean, 
                 Met_OPC = Met_OPC, PM_data = PM_data, sampling_period = sampling_period))
     
+    
+} else if ((Counts_units =="counts/L")) {
+    bins_OPC <- General.df
+    n.bins_OPC <- names(bins_OPC) [which(names(bins_OPC) != "date")] 
+    # transpose data by bin 
+    bins_diameters <- gather(bins_diameters, "bins", "diameters")
+    Counts <- bins_OPC[, n.bins_OPC]
+    Counts <- Counts %>%
+        gather("bins", "counts")
+    
+    # merge with diameters
+    Counts <- Counts %>%
+        left_join(bins_diameters, by = c("bins"))
+
+    
+    # only select counts > 0
+    counts_OPC <- Counts %>%
+        dplyr::select(diameters,
+                      counts) 
+    
+    # calculate mean of counts of OPC by time range
+    counts_OPC <- counts_OPC %>%
+        dplyr::group_by(diameters) %>%
+        dplyr::summarise(counts = mean(counts, na.rm = T))
+    
+    return(list(bins_OPC = bins_OPC, counts_OPC = counts_OPC, Counts_units = Counts_units))
+    
+}
+    
 }
 
 
@@ -7138,7 +7169,7 @@ Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NUL
     if (!(is.null(GF))) {
         # x are the DRY diameters!!! (D_dry = D_wet/GF)
         DataXY <- data.frame(x = log10(counts_OPC$diameters/GF),
-                         y = log10(counts_OPC$counts))
+                             y = log10(counts_OPC$counts))
     } else if ((is.null(GF))) {
         # x are the WET diameters!!!
         DataXY <- data.frame(x = log10(counts_OPC$diameters),
@@ -7154,6 +7185,7 @@ Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NUL
     
     return(predict_OPC = predict_OPC)
 }
+
 
 
 # # prediction of OPC Volume Value using the result of the Model
@@ -7183,22 +7215,44 @@ if (!(is.null(GF))) {
 
 
 # plot predicted value of the OPC sensor
-Plot_Distribution_OPC_Sensor <- function(counts_OPCN, counts_Ref, predict_OPC, DateBegin = Start_Time, DateEnd = Stop_Time) {
-    
+Plot_Distribution_OPC_Sensor <- function(counts_OPC, counts_Ref, predict_OPC, DateBegin = Start_Time, DateEnd = Stop_Time,
+                                         Counts_units = NULL) {
+  # browser()
+if  (is.null(predict_OPC)) {
     
     plot <-  ggplot() + 
         theme_bw() +
-        geom_point(data = counts_OPCN, aes(log10(diameters), log10(counts), col = "OPC"), stat="identity") +
-        geom_point(data = counts_Ref, aes(log10(diameters), log10(counts), col = "ref"), stat = "identity", fill = "gray") +
-        geom_point(data = predict_OPC, aes(log10(diameters), log10(predict_counts), col = "predict"), stat="identity") +
-        scale_color_manual(values = c("OPC" = "black", "ref" = "red", "predict" = "blue")) +
+        geom_point(data = counts_OPC, aes((diameters), (counts), col = "OPC"), stat="identity") +
+        geom_point(data = counts_Ref, aes((diameters), (counts), col = "ref"), stat = "identity") +
+        scale_color_manual(values = c("OPC" = "black", "ref" = "blue")) +
+        scale_x_continuous(trans='log10') +
+        scale_y_continuous(trans='log10') +
         theme(axis.title.x = element_text(colour="black", size=15),
               axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size=15, colour = "black")) +
         theme(axis.title.y = element_text(colour="black", size=15),
               axis.text.y  = element_text(angle=0, vjust=0.5, size=15, colour = "black")) +
-        xlab(expression(paste("log10 of diameter (µm)"))) + 
-        ylab(expression(paste("log10 of counts / log of diameters"))) +
+        xlab(expression(paste("diameter ", ('\u03BCm')))) +  # (µm)"))) + 
+        # ylab(expression(paste("log10 of counts / log of diameters"))) +
+        ylab(Counts_units) +
         ggtitle((paste("from ", format(DateBegin, "%y-%m-%d %H:%M"), " to ", format(DateEnd, "%y-%m-%d %H:%M")))) 
+    
+} else {
+    plot <-  ggplot() + 
+        theme_bw() +
+        geom_point(data = counts_OPC, aes((diameters), (counts), col = "OPC"), stat="identity") +
+        geom_point(data = counts_Ref, aes((diameters), (counts), col = "ref"), stat = "identity", fill = "gray") +
+        geom_point(data = predict_OPC, aes((diameters), (predict_counts), col = "predict"), stat="identity") +
+        scale_color_manual(values = c("OPC" = "black", "ref" = "red", "predict" = "blue")) +
+        scale_x_continuous(trans='log10') +
+        scale_y_continuous(trans='log10') +
+        theme(axis.title.x = element_text(colour="black", size=15),
+              axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size=15, colour = "black")) +
+        theme(axis.title.y = element_text(colour="black", size=15),
+              axis.text.y  = element_text(angle=0, vjust=0.5, size=15, colour = "black")) +
+        xlab(expression(paste("diameter ", ('\u03BCm')))) + 
+        ylab(Counts_units) +
+        ggtitle((paste("from ", format(DateBegin, "%y-%m-%d %H:%M"), " to ", format(DateEnd, "%y-%m-%d %H:%M")))) 
+}
     
     # attach DateTime label in the filename
     year_start <- str_sub(DateBegin, start = 0, end = -16)
@@ -7269,7 +7323,8 @@ Plot_Dist_Vol_log <- function(Volume_Ref, Volume_OPC, Predict_Dist_OPC_Volume, D
 } 
 
 
-Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Sensor_dates = NULL, Min_APS = NULL, Max_APS = NULL) {
+Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Sensor_dates = NULL, Min_APS = NULL, Max_APS = NULL,
+                                diameters_bins = NULL, units = NULL) {
     # RefData:      a dataframe that includes all the reference data (dates, coordinates, gas, PM mass concentration, bins ...) 
     #               The binned counts and diameters shall not be log transformed. Units of diameters: working with micrometers 
     #               and other units were not tested
@@ -7330,6 +7385,8 @@ Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Senso
         gsub(pattern = "Bin.DMPS.", replacement = "", x = .) %>%
         as.numeric
     
+    # check if diameters of APS and DMPS are not Null (this is the case when we use reference data from GRIMM)
+    if (length(Diam_APS !=0) | length (Diam_DMPS) != 0) {
     ### Remove "Bin.DMPS." and "Bin.APS." from column names of RefData
     names(RefData) = gsub(pattern = paste0(c("Bin.DMPS.", "Bin.APS."),collapse = "|"), 
                           replacement = "", x = names(RefData))
@@ -7338,8 +7395,6 @@ Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Senso
     # change with colmeans
     diameter_names <- as.character(c(Diam_DMPS,Diam_APS))
     Ref_Bins       <- RefData[, which(names(RefData) %in% diameter_names)]
-    
-
     counts_Ref <- colMeans(Ref_Bins, na.rm = T)
     counts_Ref <- as.data.frame((counts_Ref))
     counts_Ref$diameters <- as.numeric(rownames(counts_Ref))
@@ -7348,6 +7403,23 @@ Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Senso
     counts_Ref <- counts_Ref %>%
         dplyr::filter(counts > 0)
     
+    # typical case when we have GRIMM data (then diameters from APS and DMPS = 0)
+    } else if (length(Diam_APS ==0) | length (Diam_DMPS) == 0)  {
+        counts_Ref <- colMeans(RefData [which(names(RefData) != "date")] , na.rm = T)
+        counts_Ref <- as.data.frame((counts_Ref))
+        counts_Ref$diameters <- as.numeric(diameters_bins)
+        rownames(counts_Ref) <- NULL
+        names(counts_Ref) <- c("counts", "diameters")
+        counts_Ref <- counts_Ref %>%
+            dplyr::filter(counts > 0)
+        if (units == "counts/L") {
+            counts_Ref <- counts_Ref %>%
+                mutate(counts = counts/1000)
+        }
+
+    }
+    
+
     if (!nrow(counts_Ref) == 0 ) {
         
         return(list(RefData_filtered = RefData, counts_Ref = counts_Ref, Diam_DMPS = Diam_DMPS, Diam_APS = Diam_APS))

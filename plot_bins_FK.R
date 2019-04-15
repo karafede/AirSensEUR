@@ -28,10 +28,8 @@ op <- par(no.readonly = TRUE)
 
 # load bin counts from OPC-N3
 # setwd
-# @home
-# WD <- "C:/JRC_CA/AirSense/Shiny"
-# @ JRC
-WD <- "L:/ERLAP/Diffusion/Box Sync/AirSensEUR/Fieldtests/Shiny"
+WD <- "C:/JRC_CA/AirSense/Shiny"
+# WD <- "L:/ERLAP/Diffusion/Box Sync/AirSensEUR/Fieldtests/Shiny"
 setwd(paste0(WD,"/JRC_11/General_data"))
 # setwd(choose.dir())
 # load fitting functions repository
@@ -250,7 +248,7 @@ Final_function_OPC <- function(Begin, End,
     
     # calculate the distribution of time-averaged data for OPC counts and Volume without using the Growing factor (K --> Kohler coefficient = NULL )
     Dist_OPC_Sensor_wet <- Distribution_OPC_Sensor(General.df = General.df, DateBegin = Start_Time, DateEnd = Stop_Time, 
-                                               bins_diameters = bins_diameters, K = NULL) 
+                                                   Counts_units ="dN/dlogDp", bins_diameters = bins_diameters, K = NULL) 
     
 
     # Correction of OPS diameter with density
@@ -293,7 +291,7 @@ f_Error_Vol <- function(K, Dist_OPC_Sensor_wet, Model.i.Vol){
 
     # calculate the distribution of time-averaged data for OPC counts and Volume using the Growing factor (K = Kohler coeff. --> Kohler_fun$minimum )
     Dist_OPC_Sensor_dry <- Distribution_OPC_Sensor(General.df = General.df, DateBegin = Start_Time, DateEnd = Stop_Time, 
-                                               bins_diameters = bins_diameters, K = Kohler_fun$minimum) 
+                                               bins_diameters = bins_diameters, Counts_units = "dN/dlogDp", K = Kohler_fun$minimum) 
     
     # calculate DRY diameter (D_dry = D_wet/GF) 
     # for Volumes of each Bin
@@ -322,7 +320,7 @@ f_Error_Vol <- function(K, Dist_OPC_Sensor_wet, Model.i.Vol){
     
     ## Plot of distribution of OPC Sensor counts versus DRY diameter in dNlog/dlog_Dp
     if (verbose) print(Plot_Distribution_OPC_Sensor(Dist_OPC_Sensor_dry$counts_OPC, Dist_Ref.full$counts_Ref, Predict_Dist_OPC_Sensor_dry,
-                                                    DateBegin = Start_Time, DateEnd = Stop_Time))
+                                                    DateBegin = Start_Time, DateEnd = Stop_Time, Counts_units = "dN/dlogDp"))
     
     ## Plot of DRY distribution of the Volume of OPC, DMPS and APS versus DRY diameter in log/log
     if (verbose) print(Plot_Dist_Vol_log(Volume_Ref, Volume_OPC = Dist_OPC_Sensor_dry$Volume_OPC, Predict_Dist_OPC_Volume_dry,
