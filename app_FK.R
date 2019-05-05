@@ -179,7 +179,7 @@ cat("\n")
 #   1.c Sourcing Functions4AES.R and SensorToolBox, geting path of ASEconfig_xx.R 
 #   1.d Loading packages (global.R)
 #----------------------------------------------------------------CR
-source("global.R")
+source("global_FK.R")
 
 #----------------------------------------------------------------CR
 #  1.e Getting the file path for ASEconfig_xx.R ----
@@ -739,13 +739,42 @@ server <- function(input, output, session) {
     })
     # Index valid sensors in ASE_name_Setime.cfg
     i.sensors.time <- reactive({
+        
         # depends on input$asc.File, to make i.sensors.time() reactive on change of shield config file
         # I do not think it is necesary, the number of sensors should remain the same, but maybe a new sensor for a new compound could be installed
         input$asc.File # to make it reactive to change of shield config file
         which(!is.na(Set.Time()[[1]]$name.sensor))
     })
+    
+    
     list.gas.sensors       <- reactive({Config()[[2]]$gas.sensor[ !is.na(Config()[[2]]$gas.sensor)]}) 
-    list.name.sensors      <- reactive({Config()[[2]]$name.sensor[!is.na(Config()[[2]]$name.sensor)]}) 
+    list.name.sensors      <- reactive({Config()[[2]]$name.sensor[!is.na(Config()[[2]]$name.sensor)]})
+    list.PM.sensors        <- reactive({
+        if (is.data.frame(INFLUX()[[1]]) && any(grepl("Bin", names(INFLUX()[[1]]))) ) {
+            # only grep the name of sensors (no bins, no numbers)
+          
+            PM.sensors <- unique(names(INFLUX()[[1]])[  grepl(pattern = "Bin", names(INFLUX()[[1]])) ])
+            # use str_locate and str_trunc from the stringr package
+            # find where the word "Bin" start in each channel
+            start_Bin_sens <- str_locate(PM.sensors, "Bin")[,1]
+            # subset on the word "Bin"
+            PM.sensors <- unique(str_sub(PM.sensors, start = 1, end = start_Bin_sens-1))
+           
+            # PM.sensors <- unique( gsub(pattern = c("|Bin|\\d|_|\\.|"), replacement = "", PM.sensors))
+            return(PM.sensors) 
+        }  else return()  
+    })
+    # AAA  <- reactive ({ c(unlist(list.name.sensors()), unlist(list.PM.sensors())) })
+    list.PM.reference     <- reactive({
+        if (is.data.frame(REFDATA()[[1]]) && any(grepl("Bin", names(INFLUX()[[1]]))) ) {
+            PM.ref <- unique(names(REFDATA()[[1]])[  grepl(pattern = "Bin", names(REFDATA()[[1]])) ])
+            start_Bin_ref <- str_locate(PM.ref, ".Bin")[,1]
+            # subset on the word "Bin"
+            PM.ref <- unique(str_sub(PM.ref, start = 1, end = start_Bin_ref-1))
+            # PM.ref <- unique( gsub(pattern = c("Bin|\\d|_|\\.|"), replacement = "", PM.ref))
+            return(PM.ref) 
+        }  else return()  
+    })
     list.gas.reference2use <- reactive({
         # return a vector with the names of gas reference using the file ASE.cfg
         # only return the list of Reference gas if they are  included into the RefData file (names(REFDATA()[[1]]))
@@ -755,6 +784,8 @@ server <- function(input, output, session) {
         Config()[[2]]$gas.reference2use[!is.na(Config()[[2]]$gas.reference2use) & 
                                             Config()[[2]]$gas.reference2use %in% names(REFDATA()[[1]])]
     })
+    
+
     
     # Reactive DownloadSensor() ----
     # Getting info on last downloaded data, make i reactive to change in INFLUX(), SOS_T(), REFDATA(), DF$General
@@ -991,7 +1022,8 @@ server <- function(input, output, session) {
             output$uiNameSensors <- renderUI({
                 radioButtons(inputId = "Sensors", 
                              label   = "Select Sensor", 
-                             choices = list.name.sensors(), inline = TRUE
+                             # choices = list.name.sensors(), inline = TRUE
+                             choices = append(list.name.sensors(), list.PM.sensors()), inline = TRUE
                 )
             })
             
@@ -3121,7 +3153,71 @@ server <- function(input, output, session) {
         }
     })
     
+    
+    
+
+    # start of merging General in Data Treatment ----
     observeEvent(input$Merge,{
+        browser()
+        
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        
+        # # initial data in General.Rdata.file for Particulate Matter
+        # General.Rdata.file  = file.path(DisqueFieldtestDir(), "General_data" , "General.Rdata")
+        # # check if file exist first.... then updated...if it is the case....
+        # if (file.exists(General.Rdata.file)) {
+        #     load(General.Rdata.file)
+        #     
+        # } else {
+        # 
+        #   General.df   <- NULL
+        #   progress <- shiny::Progress$new()
+        #   # initial data in General.Rdata.file
+        #   D <- GENERAL(WDoutput                     = file.path(DisqueFieldtestDir(), "General_data"),
+        #                         UserMins            = as.numeric(input$UserMins),
+        #                         Delay               = as.numeric(input$Delay),
+        #                         RefData             = REFDATA()[[1]],
+        #                         InfluxData          = INFLUX()[[1]],
+        #                         SOSData             = SOS_T()[[1]],
+        #                         var.name.GasSensors = list.gas.sensors()  ,
+        #                         DownloadSensor      = DownloadSensor()
+        #                         # Change.Delay        = Change.Delay(),
+        #                         # Change.UserMins     = Change.UserMins()
+        #   )
+        # 
+        #   # safe General.df.Rdata
+        #   # check if whole_DATA contain the names "Bin" or "Particulate Matter"
+        #   if (any(grepl("Bin|PM|GRIMM|APS|DMPS", as.character(names(D))) == TRUE)) {
+        #       # save.General.df <- TRUE
+        #       General.df <- D
+        #       # saving General data
+        #       save(General.df, file = General.Rdata.file)
+        #       progress$set(message = "[shiny, Save()] INFO, Saving all data and Config files", value = 1)
+        #       on.exit(progress$close())
+        #   }
+        # }  
+        # 
+        # if (any(grepl("Bin|PM|GRIMM|APS|DMPS", as.character(names(General.df))) == TRUE)) {
+        #     cat ("write new code here to process Bins and Ref data")
+        # }  
+
+
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        ############################################################################
+        
         
         # Updating date of al dateRange when date of input$Valid is changed and moving buttons ----
         observeEvent({
@@ -4237,7 +4333,7 @@ server <- function(input, output, session) {
                                     animation = FALSE
                                 )
                             } else {
-                                
+
                                 D <- GENERAL(WDoutput            = file.path(DisqueFieldtestDir(), "General_data"), 
                                              UserMins            = as.numeric(input$UserMins), 
                                              Delay               = as.numeric(input$Delay), 
@@ -4250,7 +4346,6 @@ server <- function(input, output, session) {
                                              Change.UserMins     = Change.UserMins()
                                 )
                                 
-                                # saving New General data if needed
                                 save.General.df <- FALSE 
                                 if (!file.exists(General.Rdata.file) ) {
                                     save.General.df <- TRUE
@@ -4342,6 +4437,30 @@ server <- function(input, output, session) {
                                     # #save(sens2ref, file         = file.path(DisqueFieldtestDir(),"General_data",paste0("ASE_name(),"_SETTIME_cfg.Rdata")))
                                     # cat(paste0("[shiny, General()]Save, INFO, ", paste0(ASE_name(),"_SETTIME.cfg")," config file saved in directory General_data.\n"))
                                     
+                                    
+                                    if (save.General.df) {
+                                        # Saving downloaded data in General_data Files
+                                        cat("-----------------------------------------------------------------------------------\n")
+                                        
+                                        # saving New General data 
+                                        progress$set(message = "[shiny, General()] INFO, Saving General.Rdata", value = 0.6)
+                                        save(General.df, file = General.Rdata.file)
+                                        
+                                        #progress$set(message = "Saving Calibrated/predicted General.csv", value = 0.7)
+                                        #write.csv(General.df, file = General.csv.file)
+                                        
+                                        # if general is saved, it is necessary to run the detection of warming, T/RH out of tolerance, Negative Ref., Invalids and outlier detection, sensor data conversion and calibration.
+                                        # It is sufficient to set to TRUE to run ind.warm then in.TRH, 
+                                        progress$set(message = "[shiny, General()] INFO, Enabling detection of warming of sensors", value = 0.9)
+                                        for (i in seq_along(list.name.sensors())) {
+                                            if (!input[[paste0("Apply.Warm",i)]]) updateCheckboxInput(session, inputId = paste0("Apply.Warm",i), label = NULL, value = TRUE)
+                                        }
+                                        
+                                        on.exit(progress$close())
+                                        
+                                        # We also need to save all config file since the ##################################################################################################C
+                                    }
+                                    
                                 } else {
                                     
                                     progress$set(message = "[shiny, General()] INFO, Loading  General.Rdata", value = 0.5)
@@ -4356,30 +4475,7 @@ server <- function(input, output, session) {
                                         General.df <- D
                                     } 
                                 }
-                                
-                                if (save.General.df) {
-                                    # Saving downloaded data in General_data Files
-                                    cat("-----------------------------------------------------------------------------------\n")
-                                    
-                                    # saving New General data 
-                                    progress$set(message = "[shiny, General()] INFO, Saving General.Rdata", value = 0.6)
-                                    save(General.df, file = General.Rdata.file)
-                                    
-                                    #progress$set(message = "Saving Calibrated/predicted General.csv", value = 0.7)
-                                    #write.csv(General.df, file = General.csv.file)
-                                    
-                                    # if general is saved, it is necessary to run the detection of warming, T/RH out of tolerance, Negative Ref., Invalids and outlier detection, sensor data conversion and calibration.
-                                    # It is sufficient to set to TRUE to run ind.warm then in.TRH, 
-                                    progress$set(message = "[shiny, General()] INFO, Enabling detection of warming of sensors", value = 0.9)
-                                    for (i in seq_along(list.name.sensors())) {
-                                        if (!input[[paste0("Apply.Warm",i)]]) updateCheckboxInput(session, inputId = paste0("Apply.Warm",i), label = NULL, value = TRUE)
-                                    }
-                                    
-                                    on.exit(progress$close())
-                                    
-                                    # We also need to save all config file since the ##################################################################################################C
-                                }
-                                
+              
                                 progress$set(message = "[shiny, General()] INFO, Merging Influx, SOS and Reference data", value = 1)
                                 
                                 # make sure to update DF$General
@@ -4465,6 +4561,7 @@ server <- function(input, output, session) {
             }
         )
         
+
         # NavBar"Data Treatment", mainTabPanel "FilteringMain" - "Config"  ----
         # Reactive Outliers_Sensor()
         Outliers_Sensor        <- reactive({
@@ -4695,6 +4792,8 @@ server <- function(input, output, session) {
             on.exit(par(op))
             
             if (nrow(General.df) > 1) {
+                
+                browser()
                 
                 # Selecting
                 General.df <- DF$General[General.df$date >= input$Valid1[1] & General.df$date <= input$Valid1[2],
@@ -5814,7 +5913,7 @@ server <- function(input, output, session) {
             # depends: 
             #       Apply$rm
             
-            Neg$Forced = TRUE
+            if (any(sapply(seq_along(list.name.sensors()), function(i) input[[paste0("rm.neg", i)]]))) Neg$Forced <- TRUE else Neg$Forced <- FALSE
         },
         priority = 151)
         observeEvent({
@@ -5832,13 +5931,18 @@ server <- function(input, output, session) {
             
             if ( Neg$Forced |
                  any(unlist(sapply(seq_along(list.gas.reference2use()), function(i) input[[paste0("Apply.R.Out", i)]]))) |
-                 !any(grepl(pattern = paste0(c("Out.Neg."), collapse = "|"), x = names(DF$General)))
+                 (any(sapply(seq_along(list.name.sensors()), function(i) input[[paste0("rm.neg", i)]])) && 
+                  !any(grepl(pattern = paste0(c("Out.Neg."), collapse = "|"), x = names(DF$General))))
             ) Outliers.Ref$Forced = TRUE else Outliers.Ref$Forced = FALSE
         },
         ignoreInit = TRUE,
         priority = 140)
         ind.ref.out.file <- file.path(DisqueFieldtestDir(), "General_data", "ind_ref_out.RDS")
-        if (file.exists(ind.ref.out.file)) init.ind.ref <- list.load(ind.ref.out.file) else {init.ind.ref <- NULL; Outliers.Ref$Forced <- TRUE}
+        if (file.exists(ind.ref.out.file) && 
+            any(sapply(seq_along(Config()[[2]]$gas.reference), function(i) input[[paste0("Apply.R.Out", i)]]))) init.ind.ref <- list.load(ind.ref.out.file) else {
+                init.ind.ref <- NULL
+                if (any(sapply(seq_along(Config()[[2]]$gas.reference), function(i) input[[paste0("Apply.R.Out", i)]]))) Outliers.Ref$Forced <- TRUE else Outliers.Ref$Forced = FALSE
+                }
         ind.ref <- reactiveValues(out = init.ind.ref) 
         observeEvent(Outliers.Ref$Forced,{
             # Return a list:
@@ -5861,6 +5965,7 @@ server <- function(input, output, session) {
                 
                 # list of index of negative values
                 ################################ ADD a Test to check that all reference parameters exists ######################
+                browser()
                 ind.neg <- apply(X = DF$General[,list.gas.reference2use()], MARGIN = 2, function(x) {as.vector(which(x < 0))})
                 
                 for (i in list.gas.reference2use()  ) {
@@ -7355,7 +7460,7 @@ server <- function(input, output, session) {
             input$Del.row.Multi
             
             # Existing MultiLinear files
-            List.Multi.Files <- list.files(path    = file.path(DisqueFieldtestDir(),"General_data"), pattern = glob2rx(paste0("*Multi*", input$Sensors, "*")))
+            List.Multi.Files <- list.files(path = file.path(DisqueFieldtestDir(),"General_data"), pattern = glob2rx(paste0("*Multi*", input$Sensors, "*")))
             
             # Creating the text files to render
             Multi.Lignes <- paste0("Existing MultiLinear File in ASE/General_Data:\n")
@@ -10174,7 +10279,10 @@ server <- function(input, output, session) {
             progress$set(message = "[shiny, Save()] INFO, Saving all data and Config files", value = 1)
             on.exit(progress$close())
         })
-    })
+        }) 
+    }
+    
+    
     
     # Button "Quit", NavBar "SelectASE" ----
     observeEvent(input$Quit, {
@@ -10188,7 +10296,8 @@ server <- function(input, output, session) {
         
         stopApp(input$Config_Files)
     })
-}  
+    
+
 
 # Run the application ====
 shinyApp(ui = ui, server = server)
