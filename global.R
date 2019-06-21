@@ -138,9 +138,11 @@ cat("[Shiny] INFO, Check or install packages needed to run the script\n")
 # Saving the time series created with dygraphs                          --> htmlwidgets, webshot
 # Projection of coordinates for leaflet                                 --> OSMscale
 # inesrting rows with NAs in a dataframe                                --> berryFunctions
+# matrix plot with ploty and ggplot                                     --> GGally
+# Interactive plot in shiny                                             --> GGally
 # library(bitops)
 #
-list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "shinyBS"         , "shinyalert"      , "shinycssloaders" , "shinyWidgets"    ,
+list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "shinyBS"         , "shinycssloaders" , "shinyWidgets"    ,
                    "DT"              , "rhandsontable"   , "stringi"         , "plyr"            , "tidyverse"       , "broom"           , "dbplyr"          , 
                    "openair"         , "lubridate"       , "zoo"             , "xts"             , "futile.options"  , 
                    "lambda.r"        , 
@@ -152,7 +154,8 @@ list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "
                    "data.table"      , "BMS"             , "rlist"           , 
                    "fields"          , "shape"           , "tools"           , "R.utils"         ,  
                    "stringr"         , "rmarkdown"       , "xtable"          , "knitr"           ,
-                   "leaflet"         , "dygraphs"        , "htmltools"       , "htmlwidgets"     , "webshot"         , "OSMscale"        , "berryFunctions") 
+                   "leaflet"         , "dygraphs"        , "htmltools"       , "htmlwidgets"     , "webshot"         , "OSMscale"        , "berryFunctions"  ,  
+                   "GGally"          , "plotly")
 
 Load.Packages(list.Packages)
 # if error on plyr then type install.packages("plyr") at the console
@@ -163,8 +166,7 @@ Load.Packages(list.Packages)
 # for linux see https://github.com/rstudio/shinyapps-package-dependencies/pull/180
 
 # GitHub, this can crash the code if you have a PROXY, the lines can be commented
-#browser()
-list.packages.github <- c("52North/sensorweb4R", "skgrange/threadr")
+list.packages.github <- c("52North/sensorweb4R", "skgrange/threadr", "daattali/shinyalert")
 for (i in list.packages.github) {
     
     # removing author name and version number

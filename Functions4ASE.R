@@ -3514,7 +3514,6 @@ Validation.tool <- function(  General, DateIN, DateEND, DateINCal = NULL, DateEN
     # Restoring graphical parameters on exit of function, even if an error occurs
     on.exit(par(op))
     
-    #browser()
     if (model.log) {
         # timeplots uncalibrated values
         if (timeseries.display) {
@@ -3566,11 +3565,12 @@ Validation.tool <- function(  General, DateIN, DateEND, DateINCal = NULL, DateEN
                                                  header           = TRUE, 
                                                  row.names        = NULL, 
                                                  comment.char     = "#"
-                                                 # ,stringsAsFactors = FALSE
+                                                 ,stringsAsFactors = FALSE
                     )
                     
                     # add covariate degrees of polynomial
-                    Degrees <-  Multi.File.df[Multi.File.df$Covariates == Covariates, "degree"]
+                    Degrees <-  Multi.File.df[Multi.File.df$Covariates %in% Covariates, "degree"]
+                    
                 } else {
                     
                     # degree of polynomial set to 1 
@@ -4465,7 +4465,6 @@ GENERAL  <- function(WDoutput, UserMins, RefData, InfluxData, SOSData, Delay, va
     
     cat("-----------------------------------------------------------------------------------\n")
     cat("[GENERAL] INFO, Checking if there are more data in InfluxData or SOSData than in General.Rdata\n")
-    #browser()
     # Checking if there are sensor data to be added to General 
     # if General.Rdata does not exist it must be created in all cases. The same if the Delay has changed 
     if (is.null(DownloadSensor$DateEND.General.prev) || Change.Delay || Change.UserMins) {
@@ -5084,7 +5083,8 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
     for (i in 1:length(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)])) {
         
         nameFile <- file.path(DisqueFieldtestDir,"General_data",paste0(ASE_name,"_Covariates_",sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],".cfg"))
-        nameGas  <- sens2ref.Covariates[sens2ref$name.sensor[!is.na(sens2ref$name.sensor)] == sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],"name.gas"]
+        nameGas  <- sens2ref[which(sens2ref$name.sensor == sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i]),"name.gas"]
+        nameSens <- sens2ref[which(sens2ref$name.sensor == sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i]),"name.sensor"]
         
         if (file.exists(nameFile)) {
             
@@ -5102,15 +5102,15 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
             if (nameGas == "CO") {
                 
                 assign(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i], 
-                       data.frame(Effects = c(paste0(nameGas,"_volt"), "Out.Ref.CO_ppm" , "Relative_humidity", "Temperature")))
+                       data.frame(Effects = c(paste0(nameSens,"_volt"), "Out.Ref.CO_ppm" , "Relative_humidity", "Temperature"))) #####################################################
             } else {
                 
                 if (nameGas == "O3" || nameGas == "NO2") {
                     
                     assign(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i], 
-                           data.frame(Effects = c(paste0(nameGas,"_volt"), "Out.Ref.NO2"    , "Out.Ref.O3"       , "Relative_humidity", "Temperature")))
+                           data.frame(Effects = c(paste0(nameSens,"_volt"), "Out.Ref.NO2"    , "Out.Ref.O3"       , "Relative_humidity", "Temperature")))
                 } else assign(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i], 
-                              data.frame(Effects = c(paste0(nameGas,"_volt"), "Out.Ref.NO"     , "Relative_humidity", "Temperature")))
+                              data.frame(Effects = c(paste0(nameSens,"_volt"), "Out.Ref.NO"     , "Relative_humidity", "Temperature")))
             } 
             
             # Saving the effect files
@@ -5136,7 +5136,7 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
             cat(paste0("[CONFIG] ERROR, the file with covariates to calibrate ", nameFile, " does not exist. File is iniatized with the R script info."), sep = "\n")
             # DEFINE The lists of variables to plot in retrieving data () to understand the inerferences - use report of lab. tests
             assign(paste0(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],"CovMod"), 
-                   data.frame(Effects = c(paste0(nameGas,"_volt"), "Temperature")))
+                   data.frame(Effects = c(paste0(nameSens,"_volt"), "Temperature")))
             
             # Saving the effect files
             SENS <- get(paste0(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],"CovMod"))

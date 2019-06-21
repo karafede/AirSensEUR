@@ -28,8 +28,8 @@ op <- par(no.readonly = TRUE)
 
 # load bin counts from OPC-N3
 # setwd
-WD <- "C:/JRC_CA/AirSense/Shiny"
-# WD <- "L:/ERLAP/Diffusion/Box Sync/AirSensEUR/Fieldtests/Shiny"
+# WD <- "C:/JRC_CA/AirSense/Shiny"
+WD <- "L:/ERLAP/Diffusion/Box Sync/AirSensEUR/Fieldtests/Shiny"
 setwd(paste0(WD,"/JRC_11/General_data"))
 # setwd(choose.dir())
 # load fitting functions repository
@@ -141,6 +141,8 @@ Final_function_OPC <- function(Begin, End,
     DataXY.DMPS <- Dist_Ref.d_TS$counts_Ref %>% filter(diameters %in% Diam_DMPS_to_keep)
     DataXY.DMPS <- data.frame(x = log10(DataXY.DMPS$diameters),
                               y = log10(DataXY.DMPS$counts))
+    
+    
     Model <- lm(y ~ x, data = DataXY.DMPS, model = TRUE, x = TRUE, y = TRUE)
     Model.i <- list(Tidy = tidy(Model), 
                     Augment = augment(Model), 
@@ -276,6 +278,7 @@ f_Error_Vol <- function(K, Dist_OPC_Sensor_wet, Model.i.Vol){
      Bin_mean_dry <- (Dist_OPC_Sensor_wet$Volume_OPC_mean$mean_diameters)/ ( ( 1 + K* (RH/ (100-RH) ) )^(1/3))
      bins_vol_dry <- round((Bin_mean_dry^3)*(pi/6), digits =3)
      # compute the "Dry" Volume of each particle sampled in each Bin 
+     # V_OPC_dry_K <- ( (Dist_OPC_Sensor_wet$counts_OPC$counts) / sampling_period) * bins_vol_dry * Dist_OPC_Sensor_wet$Volume_OPC$weight
      V_OPC_dry_K <- ( (Dist_OPC_Sensor_wet$counts_OPC$counts) / sampling_period) * bins_vol_dry * Dist_OPC_Sensor_wet$Volume_OPC$weight
      
      # difference between "dry" volume (depending from K) and the predicted Volume (at the ref value...that is also dry volume)
@@ -432,13 +435,13 @@ df_OPC_all <-  df_OPC[, !names(df_OPC) %in% c("Start_Time", "Stop_Time", "densit
                                               "Temp", "Hum", "OPCTemp", "OPCHum", "OPCVol","OPCTsam",
                                               "OPC_PM1", "OPC_PM25", "OPC_PM10", "Ref_PM10")] 
 
-df_OPC_ref_counts <- df_OPC_all[grep(patter = "\\_ref\\b", x = names(df_OPC_all))]
+df_OPC_ref_counts <- df_OPC_all[grep(pattern  = "\\_ref\\b", x = names(df_OPC_all))]
 # df_OPC_counts <- df_OPC_all[ , !names(df_OPC_all) %in% names(df_OPC_ref_counts)]
 # select only COUNTS from the OPC sensor for each BIn
-df_OPC_counts <- df_OPC_all[grep(patter = "\\_sensor\\b", x = names(df_OPC_all))]
+df_OPC_counts <- df_OPC_all[grep(pattern = "\\_sensor\\b", x = names(df_OPC_all))]
 # select only VOlumes from the OPC sensor for each Bin
-df_OPC_volume <- df_OPC_all[grep(patter = "\\_Vol_Sens\\b", x = names(df_OPC_all))]
-df_OPC_ref_volume <- df_OPC_all[grep(patter = "\\_Vol_ref_Sens\\b", x = names(df_OPC_all))]
+df_OPC_volume <- df_OPC_all[grep(pattern  = "\\_Vol_Sens\\b", x = names(df_OPC_all))]
+df_OPC_ref_volume <- df_OPC_all[grep(pattern = "\\_Vol_ref_Sens\\b", x = names(df_OPC_all))]
 
 # Calculate residuals (between sensor COUNTS and reference COUNTS) at DRY diameters
 df_OPC_Counts_residuals <- df_OPC_counts - df_OPC_ref_counts
@@ -550,7 +553,9 @@ for (i in 1:n_Bins) {
 # be used in the growing function expression g(RH)
 ###############################################################################
 ###############################################################################
-
+# set START and END time again
+Start_Time <- as.POSIXct("2018-09-30 01:00:01", tz = "UTC") #"2018-09-30 01:00"
+Stop_Time   <- as.POSIXct("2018-10-07 01:00:01", tz = "UTC") # "2018-10-07 01:00"
 
 # reload all OPC data with OPC COUNTS for each bin, VOLUME for each bin and predicted OPC  COUNTS data according to the reference  
 df_OPC <- read.csv("summary_OPC_Counts_Volume_dry.csv", header = T)

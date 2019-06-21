@@ -2846,10 +2846,10 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                         Reference.i$date  <- as.POSIXct(Reference.i$date,format="%d/%m/%Y %H:%M:%S", tz="UTC")
 
                         # make all fileds as numeric
-                        Reference.i[, names(Reference.i)[which(names(Reference.i) != "date")]] <- sapply(names(Reference.i)[which(names(Reference.i) != "date")], function(x) { as.numeric(Reference.i[,x])})
+                        Reference.i[, names(Reference.i)[which(names(Reference.i) != "date")]] <- sapply(names(Reference.i)[which(names(Reference.i) != "date")], function(x) { as.numeric( as.character(Reference.i[,x])) } )
 
                         # calculate the effective number of counts within two consecutive Bins of the GRIMM
-                        Reference.i[,paste0("Bin", 1:(length(n.bin.GRIMM)-1))] <- sapply(1:(length(n.bin.GRIMM)-1),   function(i) Reference.i[ ,paste0("Bin",i)] - Reference.i[, paste0("Bin",i+1)])
+                        Reference.i[,paste0("Bin", 1:(length(n.bin.GRIMM)-1))] <- sapply(1:(length(n.bin.GRIMM)-1), function(i) Reference.i[ ,paste0("Bin",i)] - Reference.i[, paste0("Bin",i+1)])
 
                     }
                     
@@ -4103,7 +4103,7 @@ INFLUXDB <- function(WDoutput,DownloadSensor,UserMins,
     # Parameters PROXY:  PROXY, URL, PORT, LOGIN, PASSWORD
     # Parameters Influx: Down.Influx, Host, Port, User, Pass, name.SQLite, name.SQLite.old, Db, Dataset, Influx.TZ
     # Sqlite database  : name.SQLite,name.SQLite.old
-    # Configuration sensors: sens2ref
+    # sens2ref         : Configuration sensors equivalent to ASE*.cfg 
     # InfluxDB data
     # asc.File          : dataframe, default is NULL, used for giving the correct name of the sensor
     
@@ -4123,7 +4123,6 @@ INFLUXDB <- function(WDoutput,DownloadSensor,UserMins,
                                      Db = Db      , Dataset = Dataset, Influx.TZ = Influx.TZ, use_google = FALSE, Page = 10000, Mean = as.numeric(UserMins)) 
             # if there are problems accessing port 443 for the google api to determine time zone add , use_google = FALSE
             # Sqlite2df returns only the new data from the AirSensEUR.db, if the whole set is needed add: Complete = TRUE in function Down_Influx
-            #browser()
             InfluxData <- Sqlite2df(name.SQLite = name.SQLite, Dataset = Dataset, Influx.TZ = Influx.TZ, UserMins = UserMins, DownloadSensor = DownloadSensor, asc.File = asc.File)
             
             var.names.meteo <-c("Temperature","Relative_humidity",  "Atmospheric_pressure")
@@ -4900,7 +4899,6 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
     cat("-----------------------------------------------------------------------------------\n")
     ASE_name           <- basename(ASEconfig); for (i in c("\\.[[:alnum:]]+$","ASEconfig")) ASE_name <- sub(pattern=i,replacement = '', basename(as.character(ASE_name)))
     DisqueFieldtestDir <- file.path(DisqueFieldtest, ASE_name)
-    
     #=====================================================================================CR
     #  ASE_name,"_Servers.cfg"
     #=====================================================================================CR
@@ -4998,7 +4996,7 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
             }
             
             # Adding Sync.Cal and Sync.Pred if missing
-            if (!grepl(pattern = paste0(c("Sync.Cal", "Sync.Pred"), collapse = "|"), x = names(sens2ref))) {
+            if (!all(grepl(pattern = paste0(c("Sync.Cal", "Sync.Pred"), collapse = "|"), x = names(sens2ref)))) {
                 sens2ref$Sync.Cal  <- FALSE
                 sens2ref$Sync.Pred <- FALSE
             }
@@ -5102,8 +5100,7 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
     write.table(t(sens2ref), file = file.path(DisqueFieldtestDir,"General_data",paste0(ASE_name,".cfg")))
     
     # reading the files with Covariates to plot and covariates to calibrate
-    #browser()
-    for (i in 1:length(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)])) {
+    for (i in seq_along(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)])) {
         
         nameFile <- file.path(DisqueFieldtestDir,"General_data",paste0(ASE_name,"_Covariates_",sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],".cfg"))
         nameGas  <- sens2ref.Covariates[sens2ref$name.sensor[!is.na(sens2ref$name.sensor)] == sens2ref$name.sensor[!is.na(sens2ref$name.sensor)][i],"name.gas"]
@@ -5168,9 +5165,11 @@ CONFIG <- function(DisqueFieldtest , ASEconfig) {
         
     }
     
+    # list of coavriates to plot: in UI "List of covariates to plot"
     Covariates <- lapply(which(!is.na(sens2ref$name.sensor)), function(i) get(sens2ref$name.sensor[i]) )
     names(Covariates) <- paste0(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)])
     
+    # list of covariates for the calibration model: lable in UI "Covariates for calibration"
     CovMod <- lapply(which(!is.na(sens2ref$name.sensor)), function(i) get(paste0(sens2ref$name.sensor[i],"CovMod")))
     names(CovMod) <- paste0(sens2ref$name.sensor[!is.na(sens2ref$name.sensor)])
     
@@ -6776,6 +6775,144 @@ Plot_Dist_Ref <- function(counts_Ref, Model.i = NULL) {
 } 
 
 
+Density_Vol <- function(Volume_Ref = Volume_Ref, 
+                        Density = Density, 
+                        Mod_type = Mod_type, 
+                        Diam_APS = NULL) {
+    
+    # Volume_Ref         Dataframe with three columns, diameters in micrometers, mean Volumes that are not log transform (real values).
+    # Density            Numeric, inital mean density of particulate matter, i. e. : 1.5
+    # Mod_type           Character, type of distribution that is fitted to PM distribution 
+    # Return             a model which fit the chosen distribution for total Volume of reference PM10 (DMPS + APS),
+    
+    # browser()
+    # DataXY <- data.frame(x = log10(Volume_Ref$diameters),
+    #                      y = log10(Volume_Ref$counts))
+    
+    DataXY <- data.frame(x = Volume_Ref$diameters,
+                         y = Volume_Ref$counts)
+    
+    # # find the index of the first maximum of the Reference Volume
+    # x.first_max <- which.max(Volume_Ref$volume)
+    # x.first_min <- which.min(Volume_Ref$volume)
+    # # find the diameter of the first maximum
+    # MU1 <- Volume_Ref$diameters[x.first_max]
+    # # find the second maximum
+    # y.second_max<- max(Volume_Ref$volume[Volume_Ref$diameters > 1])
+    # y.second_min<- min(Volume_Ref$volume[Volume_Ref$diameters > 1])
+    # # find the incex of the second max
+    # x.second_max <- which(Volume_Ref$volume == y.second_max)
+    # x.second_min <- which(Volume_Ref$volume == y.second_min)
+    # # find the diameter of the second max
+    # MU2 <- Volume_Ref$diameters[x.second_max]
+    # 
+    # 
+    # # initial values
+    # C <- min(DataXY$y, na.rm = T)
+    # K1 = abs(DataXY$y[x.first_max] - DataXY$y[x.first_min])
+    # K2 = abs(DataXY$y[x.second_max] - DataXY$y[x.second_min])
+    
+    if (Mod_type == 'bi_Normal') {
+        Model <- nlsLM(y ~  K1* dnorm(x, mu1, sigma1) + K2* dnorm(x, mu2, sigma2) + C ,
+                       data    = DataXY,
+                       start   = list(mu1 = MU1, sigma1 = 0.2, K1 = K1, mu2 = MU2, K2 = K2, sigma2 = 0.2, C = C),
+                       model   = TRUE, trace = T)
+    } else if (Mod_type == 'GAM_GAUSS') {  
+        Model <- gam(y~s(x), family = gaussian(link = identity), data = DataXY)
+        
+    } 
+    
+    print(summary(Model))
+    
+    # fitted data
+    Model.i <- list(Model = Model, Tidy = tidy(Model), Augment = augment(Model), Glance = glance(Model), Call = Model$call, Coef = coef(Model))
+    
+    # plot <-  ggplot() +
+    #     theme_bw() +
+    #     geom_point(data = Volume_Ref, aes(log10(diameters), log10(volume), col = "Ref"), stat = "identity", fill = "gray") +
+    #     geom_line(data = Model.i$Augment, aes((x), (.fitted),  col = "Modelled"), size = 1) +
+    #     scale_color_manual(values = c("Modelled" = "blue", "Ref" = "black")) +
+    #     theme(axis.title.x = element_text(colour = "black", size = 15),
+    #           axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size = 15, colour = "black")) +
+    #     theme(axis.title.y = element_text(colour = "black", size = 15),
+    #           axis.text.y  = element_text(angle=0, vjust=0.5, size = 15, colour = "black")) +
+    #     xlab(expression(paste("diameter (µm)"))) +
+    #     ylab(expression(paste("Volume")))
+    # print (plot)
+    
+    return(Model.i) 
+}
+
+Density_Vol <- function(Volume_Ref = Volume_Ref, 
+                        Density = Density, 
+                        Mod_type = Mod_type, 
+                        Diam_APS = NULL) {
+    
+    # Volume_Ref         Dataframe with three columns, diameters in micrometers, mean Volumes that are not log transform (real values).
+    # Density            Numeric, inital mean density of particulate matter, i. e. : 1.5
+    # Mod_type           Character, type of distribution that is fitted to PM distribution 
+    # Return             a model which fit the chosen distribution for total Volume of reference PM10 (DMPS + APS),
+    
+    # browser()
+    # DataXY <- data.frame(x = log10(Volume_Ref$diameters),
+    #                      y = log10(Volume_Ref$counts))
+    
+    DataXY <- data.frame(x = Volume_Ref$diameters,
+                         y = Volume_Ref$counts)
+    
+    # # find the index of the first maximum of the Reference Volume
+    # x.first_max <- which.max(Volume_Ref$volume)
+    # x.first_min <- which.min(Volume_Ref$volume)
+    # # find the diameter of the first maximum
+    # MU1 <- Volume_Ref$diameters[x.first_max]
+    # # find the second maximum
+    # y.second_max<- max(Volume_Ref$volume[Volume_Ref$diameters > 1])
+    # y.second_min<- min(Volume_Ref$volume[Volume_Ref$diameters > 1])
+    # # find the incex of the second max
+    # x.second_max <- which(Volume_Ref$volume == y.second_max)
+    # x.second_min <- which(Volume_Ref$volume == y.second_min)
+    # # find the diameter of the second max
+    # MU2 <- Volume_Ref$diameters[x.second_max]
+    # 
+    # 
+    # # initial values
+    # C <- min(DataXY$y, na.rm = T)
+    # K1 = abs(DataXY$y[x.first_max] - DataXY$y[x.first_min])
+    # K2 = abs(DataXY$y[x.second_max] - DataXY$y[x.second_min])
+
+    if (Mod_type == 'bi_Normal') {
+        Model <- nlsLM(y ~  K1* dnorm(x, mu1, sigma1) + K2* dnorm(x, mu2, sigma2) + C ,
+                       data    = DataXY,
+                       start   = list(mu1 = MU1, sigma1 = 0.2, K1 = K1, mu2 = MU2, K2 = K2, sigma2 = 0.2, C = C),
+                       model   = TRUE, trace = T)
+    } else if (Mod_type == 'GAM_GAUSS') {  
+        Model <- gam(y~s(x), family = gaussian(link = identity), data = DataXY)
+        
+    } 
+    
+    print(summary(Model))
+    
+    # fitted data
+    Model.i <- list(Model = Model, Tidy = tidy(Model), Augment = augment(Model), Glance = glance(Model), Call = Model$call, Coef = coef(Model))
+    
+    # plot <-  ggplot() +
+    #     theme_bw() +
+    #     geom_point(data = Volume_Ref, aes(log10(diameters), log10(volume), col = "Ref"), stat = "identity", fill = "gray") +
+    #     geom_line(data = Model.i$Augment, aes((x), (.fitted),  col = "Modelled"), size = 1) +
+    #     scale_color_manual(values = c("Modelled" = "blue", "Ref" = "black")) +
+    #     theme(axis.title.x = element_text(colour = "black", size = 15),
+    #           axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size = 15, colour = "black")) +
+    #     theme(axis.title.y = element_text(colour = "black", size = 15),
+    #           axis.text.y  = element_text(angle=0, vjust=0.5, size = 15, colour = "black")) +
+    #     xlab(expression(paste("diameter (µm)"))) +
+    #     ylab(expression(paste("Volume")))
+    # print (plot)
+    
+    return(Model.i) 
+}
+
+
+
 Density_Vol_Ref_log <- function(Volume_Ref, Density, Mod_type, Diam_APS = NULL) {
   
   # Volume_Ref         Dataframe with three columns, diameters in micrometers, mean Volumes that are not log transform (real values).
@@ -6835,8 +6972,10 @@ Density_Vol_Ref_log <- function(Volume_Ref, Density, Mod_type, Diam_APS = NULL) 
   
   # plot <-  ggplot() +
   #     theme_bw() +
-  #     geom_point(data = Volume_Ref, aes(log10(diameters), log10(volume), col = "Ref"), stat = "identity", fill = "gray") +
+  #     geom_point(data = Volume_Ref, aes((diameters), (counts), col = "Ref"), stat = "identity", fill = "gray") +
   #     geom_line(data = Model.i$Augment, aes((x), (.fitted),  col = "Modelled"), size = 1) +
+  #      scale_x_continuous(trans='log10') +
+  #     scale_y_continuous(trans='log10') +
   #     scale_color_manual(values = c("Modelled" = "blue", "Ref" = "black")) +
   #     theme(axis.title.x = element_text(colour = "black", size = 15),
   #           axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size = 15, colour = "black")) +
@@ -6957,7 +7096,7 @@ Diam_APS_Corr <- function(Diam_APS, Diam_Dist_Ref, density) {
 
 
 # OPC Sensors (OPCN3) ################################################
-f_dcounts_ddp <- function(n.bins_OPC, bins_OPC, bins_diameters, Counts_units ) {
+f_dcounts_ddp <- function(n.bins_OPC = n.bins_OPC, bins_OPC = bins_OPC, bins_diameters = bins_diameters, Counts_units = Counts_units ) {
   # nbin:             name of current bin as "Bin0", "Bin1", ...
   # bins_OPC:         dataframe with counts (real values) for all bins,. Column names "Bin0", "Bin1", ...
   # n.bins_OPC        dataframe of one line of charaters with all bin names as "Bin0", "Bin1", ...
@@ -6966,318 +7105,241 @@ f_dcounts_ddp <- function(n.bins_OPC, bins_OPC, bins_diameters, Counts_units ) {
   # return:           Numerical vector, with values of dN/dlogDp
   # browser()
   nbin.next <- paste0("Bin", as.numeric(sub(pattern = "Bin",replacement = "",n.bins_OPC)) +1 )
-  if (Counts_units == "dN/dlogDp") {
-    return(as.vector(bins_OPC[,n.bins_OPC] / as.vector(log10( t(bins_diameters[nbin.next]) / t(bins_diameters[n.bins_OPC]))))) 
-  }  else stop(cat("ERROR unknown units of reference counts to correct sensor counts\n"))
+#  if (Counts_units == "dN/dlogDp") {
+    return(as.vector(bins_OPC[,n.bins_OPC] / as.vector(log10( t(bins_diameters[nbin.next]) / t(bins_diameters[n.bins_OPC])))) ) 
+#  }  else stop(cat("ERROR unknown units of reference counts to correct sensor counts\n"))
   
 } 
 
 
-Distribution_OPC_Sensor <- function(General.df, DateBegin= NULL, DateEnd=NULL, bins_diameters, Sensor_dates = NULL, 
-                                    Dist_Ref.full = NULL, Counts_units = NULL, Vol_units = "ml", K = NULL) {
-  # Counts_units:     Character, default is counts per ml
-  # General.df        numerical counts for OPC data for each Bin (Bin0, Bin1.....Bin23)
-  # output is a list of bins_OPC: character vector of diameter names (Bins)
-  #                     counts_OPC: dataframe of dCount/dlogDp
-  #                     Volume_OPC = Volume_OPC, Met_OPC = Met_OPC, PM_data
-  # Selecting dates
-  if (!all(is.null(c(DateBegin, DateEnd)))) {
+Distribution_OPC_Sensor <- function(General.df, 
+                                    Sensor.name, 
+                                    DateBegin= NULL, 
+                                    DateEnd=NULL, 
+                                    bins_diameters,  
+                                    bins_volume, 
+                                    bins_weight, 
+                                    max_diameter = NULL, 
+                                    Sensor_dates = NULL, 
+                                    Dist_Ref.full = NULL, 
+                                    Counts_units = NULL, 
+                                    Sensor.unit = NULL,
+                                    Vol_units = "ml", 
+                                    K = NULL) {
+    # Counts_units:     Character, default is counts per ml
+    # Sensor.name:      Character, name of PM sensor selected in Ui by input$Sensors
+    # General.df        numerical counts for OPC data for each Bin (Bin0, Bin1.....Bin23)
+    # output is a list of bins_OPC: character vector of diameter names (Bins)
+    #                     counts_OPC: dataframe of dCount/dlogDp
+    #                     Volume_OPC = Volume_OPC, Met_OPC = Met_OPC, PM_data
     
-    if (!(is.null(DateBegin))) General.df <- General.df %>% filter(date >= DateBegin)
-    if (!(is.null(DateEnd)))   General.df <- General.df %>% filter(date <= DateEnd)
-  }
-  if (!is.null(Sensor_dates))  General.df <- General.df %>% filter(date <= Sensor_dates)
-  
-  # make all fields as numeric for OPCN3
-  
-  # browser()
-  if (Counts_units =="dN/dlogDp") {
+    # make all fields as numeric for all the Bins
+    
     # browser()
-    General.df[,grep("Bin",names(General.df))] <- sapply(names(General.df[,grep("Bin",names(General.df))]), function(x) { as.numeric(General.df[,x])})
+    
+    # General.df[,grep("Bin",names(General.df))] <- sapply(names(General.df[,grep("Bin",names(General.df))]), function(x) { as.numeric(General.df[,x])})
+  
+    # names of all COUNTS from Bins; remove the Sensor.name 
+    n.bins_OPC <-  gsub(Sensor.name, "", names(General.df[,grep(pattern = paste0(Sensor.name, "Bin"), x = names(General.df))]))
+    
+    # remove the name "OPCN3" in General.df
+    names(General.df) <- gsub(Sensor.name, "", names(General.df))
+  
+      if (Sensor.name %in% "OPCN3") { 
+    
+        # bins to remove because <= max diameter of the REFERENCE (to be used in the plot)
+        bins_to_remove <-  n.bins_OPC[!n.bins_OPC %in% n.bins_OPC[bins_diameters <= max_diameter]]
+        
+        # remove columns in the General.df corresponding to the "bins_to_remove"
+        # General.df <- General.df %>%
+        #     dplyr::select( -bins_to_remove) 
+        
+        
+    } else if (Sensor.name %in% "PMS5003") {
+    
+        # calculate the effective number of counts within two consecutive Bins of the COUNTS from PMS5003
+        n.bins_OPC <- n.bins_OPC[seq_along(n.bins_OPC[-1])]
+        General.df[ ,paste0("Bin", seq_along(n.bins_OPC[-1]) )] <- sapply( seq_along(n.bins_OPC[-1]), function(i) General.df[ ,paste0("Bin",i)] - General.df[, paste0("Bin",i+1)])
+
+        # convert all COUNTS from counts/0.1L --> counts/mL
+         General.df[, n.bins_OPC] <- mapply(`*`,0.01, General.df[, n.bins_OPC ])
+    }
     
     
-    # assign diameters to OPCN3 data
-    # select date and counts
-    # bin_OPC is bins[channel] / airVolume (count/OPCVol) ...given as output from Grafana (#/ml --> #/cm3)
-    bins_OPC <- General.df[ , grep(pattern=(paste0(c("date", "Bin", "Relative_humidity", "OPCVol", "OPCTsam"), collapse = "|")) ,names(General.df))]
+    if (Sensor.unit == "dcounts.dlogD-1") {  
+        ######################
+        ###### dN/dlogDp #####
+        ######################
+        # initialize empty matrix to compute the dN/dlogDp (!!! we are going to lose the last Bin with this operation!)
+        dcounts_dLogDp           <- matrix(rep(0, nrow(General.df) *  length(n.bins_OPC)), 
+                                           nrow = nrow(General.df), 
+                                           ncol = length(n.bins_OPC))
+        colnames(dcounts_dLogDp) <- n.bins_OPC
+        
+        # transform all counts into dN/dlogDp
+        dcounts_dLogDp <- sapply(n.bins_OPC[1:length(n.bins_OPC)-1], f_dcounts_ddp, 
+                                 bins_OPC = General.df[, n.bins_OPC], 
+                                 bins_diameters = bins_diameters,
+                                 Counts_units = Counts_units)
+
+        # redefine General.df
+        dcounts_dLogDp  <- as.data.frame(dcounts_dLogDp)
+        
+        # add dcounts_dLogDp to DF$General (overwrite the Bin names)
+        for (i in seq_along(n.bins_OPC[-1])) {
+            # browser()
+            General.df[which(General.df$date >= DateBegin &
+                            General.df$date <= DateEnd),
+                            n.bins_OPC[seq_along(n.bins_OPC[-1])[i]]]  <- dcounts_dLogDp[,i]
+        } 
+        
+        
+        # redefine General.df
+        bins_diameters <- bins_diameters[seq_along( n.bins_OPC)]
+        bins_volume    <- bins_volume[seq_along( n.bins_OPC)]
+        bins_weight    <- bins_weight[seq_along( n.bins_OPC)]
+        n.bins_OPC     <- n.bins_OPC[seq_along( n.bins_OPC)]
+    }   
     
-    # include met data: Temprature and Humidity from ambient air (Tem, Hum) and OPC sensor (OPCHum, OPCTemp)
-    # include sampling volume and rate (OPCVol, OPCTsam)
-    Met_OPC <-  General.df %>%
-      dplyr::select(Temperature,
-                    Relative_humidity,
-                    OPCTemp,
-                    OPCHum,
-                    OPCVol,
-                    OPCTsam)
-    
-    
-    # inlculde PM data from sensor (Particulate_Matter_10) and from reference (Ref.PM10)
-    PM_data <- General.df %>%
-      dplyr::select(Particulate_Matter_1,
-                    Particulate_Matter_10,
-                    Particulate_Matter_25,
-                    Ref.PM10)
-    
-    
-    # remove all NA and NaN value
-    bins_OPC <- na.omit(bins_OPC)
-    
-    # calculate dN/d(bin) in log10 scale for 2 each consecutive bins  "dN/dlogDp" corresponding to the unit of the reference counts
-    # index and names of ONLY OPC columns in bin_OPC
-    i.bins_OPC <- setdiff(names(bins_OPC) %>% grep(pattern = "Bin", x = .),names(bins_OPC) %>% grep(pattern = paste(c("DMPS", "APS"), collapse = "|"), x = .))
-    # names of the Bins OPC with their own order
-    n.bins_OPC <- names(bins_OPC[i.bins_OPC])
-    
-    
-    # initialize empty matrix
-    dcounts_dLogDp <- matrix(rep(0, nrow(bins_OPC) *  length(i.bins_OPC)), nrow = nrow(bins_OPC), ncol = length(i.bins_OPC))
-    colnames(dcounts_dLogDp) <- n.bins_OPC
-    
-    # transform all counts into dN/dlogDp
-    dcounts_dLogDp <- sapply(n.bins_OPC, f_dcounts_ddp, bins_OPC = bins_OPC, bins_diameters = bins_diameters,
-                             Counts_units = Counts_units)
-    
-    dcounts_dLogDp <- as.data.frame(dcounts_dLogDp)
-    
-    # add the date field to the counts
-    dcounts_dLogDp$date <- bins_OPC$date
-    # put date as first variable
-    dcounts_dLogDp <- dcounts_dLogDp %>%
-      select(date, everything())
-    # dcounts_dLogDp$OPCVol <- bins_OPC$OPCVol
-    
-    #####################################################
+
     # as per discussion with Jean Philippe, we need to remove those Bins with the counts N == 0 or < 1 within the chosen time-interval
     # those count are not realistic and they should be replaced with NAs
     
-    # find all the Bin for which counts N <= 1
-    Bins_to_invalidate <-  apply(bins_OPC[ ,n.bins_OPC] * bins_OPC$OPCVol , MARGIN = 1,
-                                 function(n.row) return(  n.bins_OPC[  n.row  <= 1 ]  ) )
-    # Bins_to_keep <- n.bins_OPC [!n.bins_OPC %in% unlist(Bins_to_invalidate[114]) ]
-    
-    # replace with NA all counts at Bin == Bin_Cut, until Bin23
-    for (i in seq_along(dcounts_dLogDp[,1])) {
-      dcounts_dLogDp[i , unlist(Bins_to_invalidate[i]) ]  <- NaN
-      # print(i)
+
+  ## remove all rows containing NAs through all columns of General.df except for the "date" field
+   row.all.na <- apply(General.df[which(names(General.df) != "date")], 1, function(x){all(is.na(x))})
+   General.df <- General.df[!row.all.na,]
+  
+    if (Sensor.name %in% "OPCN3") { 
+        
+        # find all the Bin for which counts* Vol N <= 1
+        Bins_to_invalidate <-  apply(General.df[,n.bins_OPC] * General.df$Vol , MARGIN = 1,
+                                     function(n.row) return(  n.bins_OPC[  n.row  <= 0.95 ]))
+    }  else {
+        
+        cat("get the sampled volume of PMS5003")
+        Bins_to_invalidate <- NULL
+        # Bins_to_invalidate <- apply(COUNTS_OPC[ ,n.bins_OPC] , MARGIN = 1,
+        #                              function(n.row) return(  n.bins_OPC[  n.row  <= 1 ] ))
     }
     
-    
-    # browser()
-    min_bin_invalid <- min(unlist(Bins_to_invalidate))
-    
-    # remove columns where there >= 40% of NaNs in the data
-    cap <- apply(dcounts_dLogDp[-1], 2, function(col)sum(is.na(col))/length(col))
-    # Bins to keep
-    Bin.cap <- names(cap[which(cap <= 0.40)])
-    dcounts_dLogDp <- dcounts_dLogDp[, Bin.cap]
-    
-    # remove "date" field
-    dcounts_dLogDp$date <- NULL
-    
+    cat("[Shiny, Dist_Sensor()] remove counts N <= 1\n")
+    for (i in seq(nrow(General.df))) {
+        General.df[i ,  Bins_to_invalidate[[i]] ]  <- 0
+    }
+
     #####################################################
     # calculate Volume for each Bin of the OPC-----------
     #####################################################
-    
-    # define sampling Period (in seconds)
-    sampling_period <- bins_OPC$OPCTsam
-    
-    # calculate Dry diameters (used to calulate the volume of each particle in each Bin) using the GF(RH)  (D_dry = D_wet/GH)
-    nbin.next <- paste0("Bin", as.numeric(sub(pattern = "Bin",replacement = "",n.bins_OPC)) +1 )
-    Bin_mean_wet <- as.vector(( t(bins_diameters[nbin.next]) + t(bins_diameters[n.bins_OPC]))/2)
+    Bin_wet <- as.vector( t(bins_diameters[seq_along(n.bins_OPC)]))
     
     # modification of diameters using the growing factor
-    RH <- bins_OPC$Relative_humidity
+    RH <- General.df[which(General.df$date >= DateBegin & General.df$date <= DateEnd), ]$Relative_humidity
     
-    # run this only for the "DRY" diameters
+    ############################################
+    # run this only for the "DRY" diameters ####
+    ############################################
     if (!(is.null(K))) {
+        
+        browser()
+        
+        # calculate the growing factor for all the Relative Humidity values (k is a constant value depending type of particle - type of sampling site)
+        # multiply the GF for all the values of the RH (by time-stamp)
+        GF <- sapply(RH, f_growing, K = K)
+        GF <- as.data.frame(GF)
+        
+        # apply growing factor
+        # multiply all elements of the vector GF with the vector of the diameters
+        Bin_dry <- mapply(`*`, 1/GF, Bin_wet)
+        Bin_dry <- as.data.frame(Bin_dry)
+        names(Bin_dry) <- n.bins_OPC[1:length(Bin_wet)]
+        
+        # calculate dry volume for each Bin and for each time-stamp (infact it changes with the relative humidity)
+        bins_volume_dry <- round((Bin_dry^3)*(pi/6), digits =3)
+        
+        # calculate volume for each Bin of the OPC sensor (per unit volume --> 1 ml (cm3))
+        # unit of volume are um3/cm3
+        # we need to use counts per seconds, therefore we will divide the row counts by the sampling time
+        # sampling time is obtained dividing the total sampling time over 1 minute 
+        
+        
+        # transform NaN into Na
+        nan.to.na <- function(x) {x[which(is.nan(x))] <- NA; return(x)}
+        # multiply bin volumes by their bin weight
+        bins_vol_dry <- as.data.frame(mapply(`*`, bins_volume_dry[ ,names(Bin_dry)], bins_weight[ ,names(Bin_dry)]))
+        # transform NaN into Na
+        bins_vol_dry[] <- lapply(bins_vol_dry, nan.to.na)
+
+        # multiply all raw counts (by time-stamp) by the "dry" volume of each bin (!!! missing "bins_weight[,n.bins_OPC]")
+        cat("[Shiny, Dist_Sensor()] remove counts N <= 1 \n")
+        V_OPC <-  mapply(`*`, General.df[which(General.df$date >= DateBegin &
+                                                              General.df$date <= DateEnd),
+                                         names(bins_vol_dry)], bins_vol_dry)
+        
+        # make a data frame
+        V_OPC <-  as.data.frame(V_OPC)
+        
+        # cat("[Shiny, Dist_Sensor()] remove invalid Bins for which counts N <= 1 \n")
+        # for (i in seq(nrow(V_OPC))) {
+        #     V_OPC[i , unlist(Bins_to_invalidate)[unlist(Bins_to_invalidate) %in% names(Bin_dry)][i] ]  <- NA
+        # }
+        
+        # attach Volume of each Bin of OPC to the General.df (overwrite the values over the existing BIn name)
+        for (i in seq_along(n.bins_OPC)) {
+            General.df[which(General.df$date >= DateBegin & General.df$date <= DateEnd),
+                       paste0("Vol.",n.bins_OPC[i])] <- V_OPC[,i]
+        } 
+        
+        
+        ##############################################
+        #### run this only for the "WET" diameters ###
+        ##############################################
+
+    
+         } else if ((is.null(K)) & Sensor.unit == "dVol.dlogD-1") {
+        
+        # browser()
+        
+        cat("[Shiny, Dist_Sensor()] multiply all raw counts (by time-stamp) by the WET volume of each bin\n")
+        V_OPC <-  apply(General.df[which(General.df$date >= DateBegin &
+                                   General.df$date <= DateEnd),
+                                   n.bins_OPC], MARGIN = 1,
+                        function(n.row) return(n.row * bins_weight[,n.bins_OPC] * bins_volume[, n.bins_OPC] ))
+
+        # make a data frame
+        V_OPC <-  dplyr::bind_rows(V_OPC)
+ 
+        # attach Volume of each Bin of OPC to the General.df (overwrite the values over the existing BIn name)
+        for (i in seq_along(n.bins_OPC)) {
+            General.df[which(General.df$date >= DateBegin & General.df$date <= DateEnd),
+                       paste0("Vol.", n.bins_OPC[i])] <- V_OPC[,i]
+        }  
       
-      # calculate the growing factor for all the Relative Humidity values (k is a constant value depending type of particle - type of sampling site)
-      # multiply the GF for all the values of the RH (by time-stamp)
-      GF <- sapply(RH, f_growing, K = K)
-      GF <- as.data.frame(GF)
-      
-      # apply growing factor
-      # multiply all elements of the vector GF with the vector of the diameters
-      Bin_mean_dry <- mapply(`*`, 1/GF, Bin_mean_wet)
-      Bin_mean_dry <- as.data.frame(Bin_mean_dry)
-      names(Bin_mean_dry) <- n.bins_OPC
-      
-      # calculate dry volume for each Bin and for each time-stamp (infact it changes with the relative humidity)
-      bins_volume_dry <- round((Bin_mean_dry^3)*(pi/6), digits =3)
-      
-      # calculate volume for each Bin of the OPC sensor (per unit volume --> 1 ml (cm3))
-      # unit of volume are um3/cm3
-      # we need to use counts per seconds, therefore we will divide the row counts by the sampling time
-      # sampling time is obtained dividing the total sampling time over 1 minute 
-      
-      # multiply bin volumes by their bin weight
-      bins_vol_dry <- as.data.frame(mapply(`*`, bins_volume_dry[, n.bins_OPC], bins_weight[,n.bins_OPC]))
-      # multiply all raw counts (by time-stamp) by the "dry" volume of each bin (!!! missing "bins_weight[,n.bins_OPC]")
-      # V_OPC <-  mapply(`*`, bins_OPC[,n.bins_OPC]/sampling_period, bins_vol_dry)
-      V_OPC <-  mapply(`*`, bins_OPC[,n.bins_OPC], bins_vol_dry)
-      
-      # run this only for the "WET" diameters
-    } else if ((is.null(K))) {
-      
-      
-      # multiply all raw counts (by time-stamp) by the "wet" volume of each bin
-      # V_OPC <-  apply(bins_OPC[,n.bins_OPC]/sampling_period, MARGIN = 1,
-      #                         function(n.row) return(n.row * bins_weight[,n.bins_OPC] * bins_volume[, n.bins_OPC] ))
-      V_OPC <-  apply(bins_OPC[,n.bins_OPC], MARGIN = 1,
-                      function(n.row) return(n.row * bins_weight[,n.bins_OPC] * bins_volume[, n.bins_OPC] ))
-      
-      # make a data frame
-      V_OPC <-  dplyr::bind_rows(V_OPC)
-    }
+    } 
     
-    # make a data frame
-    V_OPC <-  as.data.frame(V_OPC)
+
+     # browser()
+    return(list(n.bins_OPC          = n.bins_OPC,
+                bins_to_remove      = ifelse(Sensor.name %in% "OPCN3",bins_to_remove, NA),
+                General.df          = General.df,
+                Bins_to_invalidate  = Bins_to_invalidate,
+                Diameters           = list(bins_diameters = bins_diameters[seq_along( n.bins_OPC)],
+                                       bins_volume    = bins_volume[seq_along( n.bins_OPC)],
+                                       bins_weight    = bins_weight[seq_along( n.bins_OPC)],
+                                       n.bins_OPC     = n.bins_OPC[seq_along( n.bins_OPC)])))
+
+   
     
-    # replace with NA all Volumes at Bin == Bin_Cut, until Bin23
-    for (i in seq(nrow(V_OPC))) {
-      V_OPC[i , unlist(Bins_to_invalidate[i]) ]  <- NaN
-    }
-    
-    
-    Bin_mean_wet <- cbind.data.frame(n.bins_OPC,
-                                     Bin_mean_wet)
-    names(Bin_mean_wet) <- c("bins", "mean_diameters")
-    Bin_mean_wet$bins <- as.character(Bin_mean_wet$bins)
-    
-    # remove column where there >= 40% of NaNs in the data
-    cap <- apply(V_OPC, 2, function(col)sum(is.na(col))/length(col))
-    # Bins to keep
-    Bin.cap <- names(cap[which(cap <= 0.40)])
-    V_OPC <- V_OPC[, Bin.cap]
-    
-    
-    # transpose data by bin 
-    bins_diameters <- gather(bins_diameters, "bins", "diameters")
-    
-    dcounts_dLogDp <- as.data.frame(dcounts_dLogDp)
-    dcounts_dLogDp <- dcounts_dLogDp %>%
-      gather("bins", "counts")
-    
-    # merge with diameters
-    dcounts_dLogDp <- dcounts_dLogDp %>%
-      left_join(bins_diameters, by = c("bins"))
-    
-    # remove all NA and NaN value
-    # dcounts_dLogDp <- na.omit(dcounts_dLogDp)
-    
-    # only select counts > 0
-    counts_OPC <- dcounts_dLogDp %>%
-      dplyr::select(diameters,
-                    counts) 
-    
-    # calculate mean of counts of OPC by time range
-    counts_OPC <- counts_OPC %>%
-      dplyr::group_by(diameters) %>%
-      dplyr::summarise(counts = mean(counts, na.rm = T))
-    
-    
-    
-    V_OPC <- as.data.frame(V_OPC)
-    V_OPC <- V_OPC %>%
-      gather("bins", "volume")
-    
-    # merge with diameters
-    V_OPC <- V_OPC %>%
-      left_join(bins_diameters, by = c("bins"))
-    
-    # remove all NA and NaN value
-    V_OPC <- na.omit(V_OPC)
-    # assign weight to each Volume in each Bin
-    
-    binsweight <- as.data.frame(t(bins_weight))
-    names_binsweight <- rownames(binsweight)
-    rownames(binsweight) <- NULL
-    binsweight <- cbind(names_binsweight,binsweight)
-    colnames(binsweight) <- c("bins", "weight")
-    binsweight$bins <- as.character(binsweight$bins)
-    
-    # attach weights for each bin
-    V_OPC <- V_OPC %>%
-      left_join(binsweight, by = c("bins"))
-    # attach mean diameter for each Bin (wet)
-    V_OPC <- V_OPC %>%
-      left_join(Bin_mean_wet, by = c("bins"))
-    
-    
-    Volume_OPC_all <- V_OPC %>%
-      dplyr::select(diameters,
-                    volume,
-                    weight,
-                    mean_diameters) 
-    
-    # calculate mean of volume of OPC by time range
-    Volume_OPC <- Volume_OPC_all %>%
-      dplyr::group_by(diameters) %>%
-      dplyr::summarise(volume = mean(volume, na.rm = T),
-                       weight = mean(weight, na.rm = T))
-    
-    Volume_OPC_mean <- Volume_OPC_all %>%
-      dplyr::group_by(mean_diameters) %>%
-      dplyr::summarise(volume = mean(volume, na.rm = T),
-                       weight = mean(weight, na.rm = T))
-    
-    
-    # browser()
-    # add Meteorolgical data
-    Met_OPC <- Met_OPC %>%
-      dplyr::summarise(Temp = mean(Temperature, na.rm = T),
-                       Hum = mean(Relative_humidity, na.rm = T),
-                       OPCTemp = mean(OPCTemp, na.rm = T),
-                       OPCHum = mean(OPCHum, na.rm = T),
-                       OPCVol = mean(OPCVol, na.rm = T),
-                       OPCTsam = mean(OPCTsam, na.rm = T))
-    
-    
-    PM_data <- PM_data %>%
-      dplyr::summarise(OPC_PM1 = mean(Particulate_Matter_1, na.rm = T),
-                       OPC_PM25 = mean(Particulate_Matter_25, na.rm = T),
-                       OPC_PM10 = mean(Particulate_Matter_10, na.rm = T),
-                       Ref_PM10 = mean(Ref.PM10, na.rm = T))
-    
-    
-    
-    return(list(bins_OPC = bins_OPC, min_bin_invalid = min_bin_invalid, 
-                counts_OPC = counts_OPC, Volume_OPC = Volume_OPC, Volume_OPC_mean = Volume_OPC_mean, 
-                Met_OPC = Met_OPC, PM_data = PM_data, sampling_period = sampling_period))
-    
-    
-  } else if ((Counts_units =="counts/L")) {
-    bins_OPC <- General.df
-    n.bins_OPC <- names(bins_OPC) [which(names(bins_OPC) != "date")] 
-    # transpose data by bin 
-    bins_diameters <- gather(bins_diameters, "bins", "diameters")
-    Counts <- bins_OPC[, n.bins_OPC]
-    Counts <- Counts %>%
-      gather("bins", "counts")
-    
-    # merge with diameters
-    Counts <- Counts %>%
-      left_join(bins_diameters, by = c("bins"))
-    
-    
-    # only select counts > 0
-    counts_OPC <- Counts %>%
-      dplyr::select(diameters,
-                    counts) 
-    
-    # calculate mean of counts of OPC by time range
-    counts_OPC <- counts_OPC %>%
-      dplyr::group_by(diameters) %>%
-      dplyr::summarise(counts = mean(counts, na.rm = T))
-    
-    return(list(bins_OPC = bins_OPC, counts_OPC = counts_OPC, Counts_units = Counts_units))
-    
-  }
-  
-}
+    min_bin_invalid  = min(unlist(Bins_to_invalidate))
+
+    # DF$General[,     names(DF$General)[grep(pattern = "Bin", x = names(DF$General))]]
+    # df <- DF$General[, names(DF$General)[grep(pattern = "Bin", x = names(DF$General))]][apply( DF$General[,names(DF$General)[grep(pattern = "Bin", x = names(DF$General))]],1,function(x)any(!is.na(x))),] 
+
+}    
 
 
+
+   
 # prediction of OPC values based of fitting model from Reference data
 # return a dataframe with corrected diamters and counts in log10 units
 Density_OPC_predict <- function(counts_OPC, Mod_type, density, Model.i.Gam = NULL, GF = NULL) {
@@ -7336,7 +7398,11 @@ Density_Vol_predict <- function(Volume_OPC, Mod_type, density, Model.i.Vol = NUL
 
 
 # plot predicted value of the OPC sensor
-Plot_Distribution_OPC_Sensor <- function(counts_OPC, counts_Ref, predict_OPC, DateBegin = Start_Time, DateEnd = Stop_Time,
+Plot_Distribution_OPC_Sensor <- function(counts_OPC, 
+                                         counts_Ref, 
+                                         predict_OPC, 
+                                         DateBegin = Start_Time, 
+                                         DateEnd = Stop_Time,
                                          Counts_units = NULL) {
   # browser()
   if  (is.null(predict_OPC)) {
@@ -7352,7 +7418,8 @@ Plot_Distribution_OPC_Sensor <- function(counts_OPC, counts_Ref, predict_OPC, Da
             axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size=15, colour = "black")) +
       theme(axis.title.y = element_text(colour="black", size=15),
             axis.text.y  = element_text(angle=0, vjust=0.5, size=15, colour = "black")) +
-      xlab(expression(paste("diameter ", ('\u03BCm')))) +  # (µm)"))) + 
+      xlab(paste("diameter ", ('\u03BCm'))) +  # (µm)"))) + 
+      # xlab(expression(paste("diameter ", ('\u03BCm')))) +  # (µm)"))) +
       # ylab(expression(paste("log10 of counts / log of diameters"))) +
       ylab(Counts_units) +
       # ylim(0, 0.004) +
@@ -7371,7 +7438,8 @@ Plot_Distribution_OPC_Sensor <- function(counts_OPC, counts_Ref, predict_OPC, Da
             axis.text.x  = element_text(angle=0, vjust=0.5, hjust = 0.5, size=15, colour = "black")) +
       theme(axis.title.y = element_text(colour="black", size=15),
             axis.text.y  = element_text(angle=0, vjust=0.5, size=15, colour = "black")) +
-      xlab(expression(paste("diameter ", ('\u03BCm')))) + 
+      xlab(paste("diameter ", ('\u03BCm'))) +
+      # xlab(expression(paste("diameter ", ('\u03BCm')))) + 
       ylab(Counts_units) +
       ggtitle((paste("from ", format(DateBegin, "%y-%m-%d %H:%M"), " to ", format(DateEnd, "%y-%m-%d %H:%M")))) 
   }
@@ -7389,27 +7457,31 @@ Plot_Distribution_OPC_Sensor <- function(counts_OPC, counts_Ref, predict_OPC, Da
   hour_end <- str_sub(DateEnd, start = 12, end = -7) 
   End <- paste0(year_end,"_",month_end,"_", day_end,"_",hour_end)
   
-  png(paste0(output_folder,"Counts_OPC/", Begin, "__", End, ".jpg"),
-      width = 1200, height = 1050, units = "px", pointsize = 30,
-      bg = "white", res = 150)
-  print(plot)
-  dev.off()
+  # png(paste0(output_folder,"Counts_OPC/", Begin, "__", End, ".jpg"),
+  #     width = 1200, height = 1050, units = "px", pointsize = 30,
+  #     bg = "white", res = 150)
+  # print(plot)
+  # dev.off()
   
   return(plot)
 }
 
 
-Plot_Dist_Vol_log <- function(Volume_Ref, Volume_OPC, Predict_Dist_OPC_Volume, DateBegin = Start_Time, DateEnd = Stop_Time) {
+Plot_Dist_Vol_log <- function(Volume_Ref, 
+                              Volume_OPC, 
+                              Predict_Dist_OPC_Volume, 
+                              DateBegin = Start_Time, 
+                              DateEnd = Stop_Time) {
   
-  # browser()    
+if  (is.null(Predict_Dist_OPC_Volume)) {    
+   # browser()    
   # plot reference data and OPC raw data (Volume)
+    
   plot <-  ggplot() + 
     theme_bw() +
     geom_point(data = Volume_Ref, aes((diameters), (volume), col = "ref"), stat = "identity", fill = "gray") +
     # add points for the Volume of the OPC sensor
     geom_point(data = Volume_OPC, aes((diameters), (volume),col = "OPC"), stat = "identity", fill = "gray") +
-    # add predicted volume
-    geom_point(data = Predict_Dist_OPC_Volume, aes((diameters), (predict_Vol), col = "predict"), stat="identity") +
     scale_color_manual(values = c("OPC" = "black", "ref" = "red", "predict" = "blue")) +
     scale_x_continuous(trans='log10') +
     scale_y_continuous(trans='log10') +
@@ -7417,11 +7489,30 @@ Plot_Dist_Vol_log <- function(Volume_Ref, Volume_OPC, Predict_Dist_OPC_Volume, D
           axis.text.x  = element_text(angle = 0, vjust = 0.5, hjust = 0.5, size = 15, colour = "black")) +
     theme(axis.title.y = element_text(colour = "black", size = 15),
           axis.text.y  = element_text(angle = 0, vjust = 0.5, size = 15, colour = "black")) +
-    xlab(expression(paste("diameter ", ('\u03BCm')))) +  
-    ylab(expression(paste("Volume  (", '\u03BCm',"\u00B3 ",  cm^-3, ")"))) +
-    # xlab(expression(paste("diameter (µm)"))) + 
-    # ylab(expression(paste("Volume  (" , cm^-3, ")"))) +
+    xlab(paste0("diameter ", ('\u03BCm'))) +
+    ylab(paste0("Volume (", '\u03BCm',"\u00B3", " cm-","\u00B3", ")" )) +
     ggtitle((paste("from ", format(DateBegin, "%y-%m-%d %H:%M"), " to ", format(DateEnd, "%y-%m-%d %H:%M")))) 
+  
+} else {
+    
+    plot <-  ggplot() + 
+        theme_bw() +
+        geom_point(data = Volume_Ref, aes((diameters), (volume), col = "ref"), stat = "identity", fill = "gray") +
+        # add points for the Volume of the OPC sensor
+        geom_point(data = Volume_OPC, aes((diameters), (volume),col = "OPC"), stat = "identity", fill = "gray") +
+        # add predicted volume
+        geom_point(data = Predict_Dist_OPC_Volume, aes((diameters), (predict_Vol), col = "predict"), stat="identity") +
+        scale_color_manual(values = c("OPC" = "black", "ref" = "red", "predict" = "blue")) +
+        scale_x_continuous(trans='log10') +
+        scale_y_continuous(trans='log10') +
+        theme(axis.title.x = element_text(colour  = "black", size = 15),
+              axis.text.x  = element_text(angle = 0, vjust = 0.5, hjust = 0.5, size = 15, colour = "black")) +
+        theme(axis.title.y = element_text(colour = "black", size = 15),
+              axis.text.y  = element_text(angle = 0, vjust = 0.5, size = 15, colour = "black")) +
+        xlab(paste0("diameter ", ('\u03BCm'))) +
+        ylab(paste0("Volume (", '\u03BCm',"\u00B3", " cm-","\u00B3", ")" )) +
+        ggtitle((paste("from ", format(DateBegin, "%y-%m-%d %H:%M"), " to ", format(DateEnd, "%y-%m-%d %H:%M")))) 
+}
   
   # attach DateTime label in the filename
   year_start <- str_sub(DateBegin, start = 0, end = -16)
@@ -7436,11 +7527,11 @@ Plot_Dist_Vol_log <- function(Volume_Ref, Volume_OPC, Predict_Dist_OPC_Volume, D
   hour_end <- str_sub(DateEnd, start = 12, end = -7) 
   End <- paste0(year_end,"_",month_end,"_", day_end,"_",hour_end)
   
-  png(paste0(output_folder,"Volume_OPC/", Begin, "__", End, ".jpg"),
-      width = 1200, height = 1050, units = "px", pointsize = 30,
-      bg = "white", res = 150)
-  print(plot)
-  dev.off()
+  # png(paste0(output_folder,"Volume_OPC/", Begin, "__", End, ".jpg"),
+  #     width = 1200, height = 1050, units = "px", pointsize = 30,
+  #     bg = "white", res = 150)
+  # print(plot)
+  # dev.off()
   
   
   return(plot)
@@ -7536,7 +7627,7 @@ Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Senso
     names(counts_Ref) <- c("counts", "diameters")
     counts_Ref <- counts_Ref %>%
       dplyr::filter(counts > 0)
-    if (units == "counts/L") {
+    if (units == "count.mL-1") {
       counts_Ref <- counts_Ref %>%
         mutate(counts = counts/1000)
     }
@@ -7549,6 +7640,71 @@ Distribution_Ref_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Senso
     return(list(RefData_filtered = RefData, counts_Ref = counts_Ref, Diam_DMPS = Diam_DMPS, Diam_APS = Diam_APS))
   } else  print ("Reference data is empty!", quote = FALSE) 
   
+}
+
+Ref_Dist_TS <- function(RefData, DateBegin = NULL, DateEnd = NULL, Sensor_dates = NULL, Min_APS = NULL, Max_APS = NULL,
+                                diameters_bins = NULL, units = NULL) {
+    # RefData:      a dataframe that includes all the reference data (dates, coordinates, gas, PM mass concentration, bins ...) 
+    #               The binned counts and diameters shall not be log transformed. Units of diameters: working with micrometers 
+    #               and other units were not tested
+    
+    # DateBegin,   The start and ending selected dates in POSIXCt format. Default values are NULL, 
+    # DateBegin      It is possible to have only one date limit, DateBegin or DateBegin. DateBegin or DateBegin are not discarded.
+    # Sensor_dates  vector of POSIXCt: the dates for which the PM sensor provides binned counts. 
+    #               In case the sensor PM data series is not complete, dates with missing PM sensor data will be discared from RefData
+    
+    # Min_APS,      Numeric, Minimum and maximum diameters of reference counts to be selected 
+    # Max_APS       for reference counts. Default values are NULL. It is possible to have only one diameter limit,  Min_APS or Max_APS.
+    #               Min_APS and Max_APS are discarded.
+    
+    # Return        a list with datafame RefData (only selected dates and names of bins corresponding to selected diameters),
+    #               datafame counts_Ref with column diameters and counts over the selected dates
+    #               vector with selected APS diameters
+    #               vector with DMPS diameter
+    #                       
+    # select only columns containing .Bin.DMPS & .Bin.APS or Bin.GRIMM
+    
+    
+    # browser()
+    # Selecting dates
+    if (!all(is.null(c(DateBegin, DateEnd)))) {
+        
+        if (!(is.null(DateBegin))) RefData <- RefData %>% filter(date >= DateBegin)
+        if (!(is.null(DateEnd)))   RefData <- RefData %>% filter(date <= DateEnd)
+    }
+    if (!is.null(Sensor_dates))  RefData <- RefData %>% filter(date <= Sensor_dates)
+    
+    #browser()
+    # Vector of diameters measured by the APS instrument
+    Diam_APS <- names(RefData)[grep(pattern = "Bin.APS.", x = names(RefData) )] %>%
+        gsub(pattern = "Bin.APS.", replacement = "", x = .) %>%
+        as.numeric
+    
+    ### APS diameters to be dropped, i. e. <= 0.89 | >= 11.97
+    if (!all(is.null(c(Min_APS, Max_APS)))) {
+        
+        Diam_APS_to_remove <- numeric()
+        if (!(is.null(Min_APS))) Diam_APS_to_remove <- Diam_APS[Diam_APS <= Min_APS]
+        if (!(is.null(Max_APS))) Diam_APS_to_remove <- c(Diam_APS_to_remove, Diam_APS[Diam_APS >= Max_APS])
+        # Discarding diameters if any diameters < Min_APS or > Max_APS
+        if (length(Diam_APS_to_remove) > 0) {
+            
+            # Discarding APS diameters from Diam_APS and RefData
+            Diam_APS           <- Diam_APS[-which(Diam_APS %in% Diam_APS_to_remove)] 
+            Diam_APS_to_remove <- paste0("Bin.APS.", Diam_APS_to_remove)
+            RefData            <- RefData[ , !names(RefData) %in% Diam_APS_to_remove]
+        }
+    }
+    
+    
+    
+    # browser()
+    # Vector of diameters measured by the DMPS instrument
+    Diam_DMPS <- names(RefData)[grep(pattern = "Bin.DMPS.", x = names(RefData) )] %>%
+        gsub(pattern = "Bin.DMPS.", replacement = "", x = .) %>%
+        as.numeric
+
+        return(list(RefData_filtered = RefData, Diam_DMPS = Diam_DMPS, Diam_APS = Diam_APS, diameters_bins = diameters_bins))  
 }
 
 # calculate VOLUME for each Bin for APS
@@ -7707,3 +7863,34 @@ f_growing <- function(RH, K = K){
   return(( 1 + K* (RH/ (100-RH) ) )^(1/3))
 }
 
+
+interpolated_OPC <- function(Dist_Ref      = Dist_Ref, 
+                             ref_diameters = ref_diameters,
+                             OPC_diameters = OPC_diameters) {
+    # Dist_Ref: numeric vector of reference values ordered as the diameters of ref_diameters
+    # ref_diameters: data frame of REFERENCE diameters 
+    # OPC_diameters: data frame of OPC diameters
+    # RETURN    : Vector of non-negative numeric() Dist_Ref interpolated at the OPC_diameters 
+    #             only if some data are not all NA
+    
+    
+    # test if NA?
+    if(!all(is.na(Dist_Ref[1:length(ref_diameters)]))) {
+        Model.i.Gam  <- Cal_Line(x = ref_diameters,
+                                 y = as.numeric(Dist_Ref[1:length(ref_diameters)]),
+                                 Mod_type = 'GAM_GAUSS',
+                                 s_x = NULL, s_y = NULL, line_position = NULL, Couleur = NULL, 
+                                 f_coef1 = NULL, f_coef2 = NULL, f_R2 = NULL, Plot_Line = F)
+        
+        # interpolate the REFERENCE over the OPC diameters (GAM model)
+        interpolate <- predict(Model.i.Gam, data.frame(x = as.numeric(OPC_diameters),
+                                                       y = rep(NA, length = length(as.numeric(OPC_diameters)))))
+        interpolate[interpolate < 0] <- NA
+        return(interpolate)
+        
+    } else {
+        return(rep(NA, length(ref_diameters)))
+    }
+    
+    
+}

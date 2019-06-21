@@ -1,0 +1,34 @@
+---
+title: R packages used
+bibliography: pkg-refs.bib
+#csl: null.csl
+---
+
+- base [@base]
+- base [@base]
+- BMS [@BMS]
+- curl [@curl]
+- devtools [@devtools]
+- DT [@DT]
+- httr [@httr]
+- jsonlite [@jsonlite]
+- kimisc [@kimisc]
+- knitr [@knitr]
+- lubridate [@lubridate]
+- openair [@openair]
+- polynom [@polynom]
+- quantreg [@quantreg]
+- RCurl [@RCurl]
+- rhandsontable [@rhandsontable]
+- RSQLite [@RSQLite]
+- rstudioapi [@rstudioapi]
+- sensorweb4R [@sensorweb4R]
+- shiny [@shiny]
+- shinydashboard [@shinydashboard]
+- sp [@sp]
+- stats [@stats]
+- tcltk [@tcltk]
+- tcltk2 [@tcltk2]
+- zoo [@zoo]
+
+## References

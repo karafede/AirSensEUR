@@ -152,7 +152,7 @@ list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "
                    "data.table"      , "BMS"             , "rlist"           , 
                    "fields"          , "shape"           , "tools"           , "R.utils"         ,  
                    "stringr"         , "rmarkdown"       , "xtable"          , "knitr"           ,
-                   "leaflet"         , "dygraphs"        , "htmltools"       , "htmlwidgets"     , "webshot"                 , "berryFunctions")  #, "OSMscale"
+                   "leaflet"         , "dygraphs"        , "htmltools"       , "htmlwidgets"     , "webshot"         , "OSMscale"        , "berryFunctions"  ,"plotly") 
 
 Load.Packages(list.Packages)
 # if error on plyr then type install.packages("plyr") at the console
