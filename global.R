@@ -140,6 +140,9 @@ cat("[Shiny] INFO, Check or install packages needed to run the script\n")
 # inesrting rows with NAs in a dataframe                                --> berryFunctions
 # matrix plot with ploty and ggplot                                     --> GGally
 # Interactive plot in shiny                                             --> GGally
+# path of AirSensEUR spatial analysis                                   --> maptools
+# path of AirSensEUR spatial analysis                                   --> raster
+# path of AirSensEUR spatial analysis                                   --> rgeos
 # library(bitops)
 #
 list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "shinyBS"         , "shinycssloaders" , "shinyWidgets"    ,
@@ -155,7 +158,7 @@ list.Packages <- c("shiny"           , "shinyjs"         , "shinythemes"     , "
                    "fields"          , "shape"           , "tools"           , "R.utils"         ,  
                    "stringr"         , "rmarkdown"       , "xtable"          , "knitr"           ,
                    "leaflet"         , "dygraphs"        , "htmltools"       , "htmlwidgets"     , "webshot"         , "OSMscale"        , "berryFunctions"  ,  
-                   "GGally"          , "plotly")
+                   "GGally"          , "plotly"          , "maptools"        , "raster"          , "rgeos"           )
 
 Load.Packages(list.Packages)
 # if error on plyr then type install.packages("plyr") at the console

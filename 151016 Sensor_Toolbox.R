@@ -1408,11 +1408,10 @@ Cal_Line <- function(x, s_x, y, s_y, Mod_type,  Multi.File = NULL, Matrice=NULL,
                     for (j in Degrees.ExpGrowth) {
                         
                         # Formula of the covarariates and final formula
-                        if (exists("Formula.Poly")) rm(Formula.Poly)
+                        if (exists("Formula.ExpGrowth")) rm(Formula.ExpGrowth)
                         Formula.ExpGrowth <- as.formula(paste("log(y[Positives] - (A0 + A1 * x[Positives])) ~ ", Multi.File.df$Covariates[j], "[Positives]"))
                         
                         Model.0 <- lm(Formula.ExpGrowth, data = DataXY)
-                        #Model.0    <- nls(Formula.ExpGrowth, data = DataXY, lower = c(-inf,0), upper = c(+inf, +inf), start = coef(Model.0.lm))
                         assign(paste0("C.", Multi.File.df$Covariates[j]), coef(Model.0)[1])
                         assign(paste0("k.", Multi.File.df$Covariates[j]), coef(Model.0)[2])
                         Start.Value[paste0("C.", Multi.File.df$Covariates[j])] <- exp(get(paste0("C.", Multi.File.df$Covariates[j])))
@@ -1441,6 +1440,7 @@ Cal_Line <- function(x, s_x, y, s_y, Mod_type,  Multi.File = NULL, Matrice=NULL,
                     }
                     
                     #fitting with Exponential growth
+                    browser()
                     Model <- nlsLM(Formula.Covariates, data = DataXY,
                                    start = Start.Value, 
                                    # start = list(a0 = A0, #coef(lm(y ~ x, data = DataXY))[1], 
@@ -2710,3 +2710,52 @@ loadRData <- function(fileName) {
 
 # transform NaN into Na
 nan.to.na <- function(x) {x[which(is.nan(x))] <- NA; return(x)}
+
+#================================================================CR
+# Checking if there are coordinates for the reference data separated by a comma and project if needed
+#================================================================CR
+get_Coord.Ref  <- function(Coordinates.chr, ShinyUpdate = False, session = NULL, ID.Long = NULL, ID.Lat = NULL) { # feed back of coordinates into the ui
+    # Coordinates.chr       : character string with long and lat coordinates separated with comma
+    # ShinyUpdate           : logical default is FALSE, if TRUE update 2 Shiny select input with decimaldegree of LOng and Lat
+    # ID.Long               : Shiny SelectInput ID for longitude
+    # ID.Lat                : Shiny SelectInput ID for latitude
+    
+    # return a numeric vector with decimal degrees of long and lat coordinates after projection from degree-minute-second notation if needed
+    
+    # checking if the separator is ","
+    if (grepl(pattern =  ",", x = Coordinates.chr)) {
+        
+        # Checking is the coordinates are in spherical or decimal format, projection to OpenStreet map
+        if (grepl(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = Coordinates.chr)) {
+            
+            # extract spherical coordinates
+            Ref.coord_LON  <- unlist(strsplit(x = Coordinates.chr, split = ","))[1]
+            Ref.coord_LAT  <- unlist(strsplit(x = Coordinates.chr, split = ","))[2]
+            # transform spherical coordinates to decimal degrees for later projection
+            Ref.coord_d    <- OSMscale::degree(Ref.coord_LAT, Ref.coord_LON, digits = 5)
+            # Project the spherical coordinates in Mercator web WS84 of OPenStreet view - This is not needed, map correct without projection
+            #Ref.coord_p    <- OSMscale::projectPoints(Ref.coord_d[1], Ref.coord_d[2], to=OSMscale::pll())
+            Ref.coord_LAT  <- Ref.coord_d[1,1]
+            Ref.coord_LON  <- Ref.coord_d[1,2]
+            
+            # updating coordinates of reference station
+            updateTextInput(session = session, 
+                            inputId = ID.Long,  
+                            value   = Ref.coord_LON)
+            updateTextInput(session = session, 
+                            inputId = ID.Lat,  
+                            value   = Ref.coord_LAT)
+        } else {
+            
+            Ref.coord_LON <- as.numeric(unlist(strsplit(x = Coordinates.chr, split = ","))[1])
+            Ref.coord_LAT <- as.numeric(unlist(strsplit(x = Coordinates.chr, split = ","))[2])
+        }
+        
+        # update Shiny Select input s
+        return(paste0(Ref.coord_LON, ",", Ref.coord_LAT))
+        
+    } else {
+        cat("[get_Coord.Ref] ERROR Coordinates are not comma separated")
+        return(paste0(NA,NA))
+    } 
+}

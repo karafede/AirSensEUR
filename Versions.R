@@ -17,7 +17,18 @@
 #                    in figures is messed up.
 #              E56 - Bug correction impossible to save graphic file of matrix plot in calibration and prediction. Corrected by setting the dimension of the graphic file. The fixed 
 #                    dimension may create distorsion of the plotted R2 and equation equation
-#                   
+#              N97 - The process of reshaping the airsenseur.db is now much faster using function spread of tidyverse in function sqlite2df()
+#              E57 - bug corection: when loading reference data using an rdata file there was a bug for the names of the fields in dataframe reference.i. Added support for temperature, 
+#                                   humidity and pressure in the reference data.
+#              N98 - bug corection: Added message to keep UTC time zone when downloading sensor data using InfluxDB uner NavbarMenu "Getdata", tab "Sensor Data".
+#              E58 - bug corection: When plotting a time series using Dygraphs, the last selected day was excluded from computation and plotting as selection returned a type Date 
+#                                   without time values. Corrected adding one day to the last selected date. All dygraph time series plots used the local time zone. Now set to UTC.
+#              N99 - Checking if R runs in 32-bist system advising to switch to a 64-bit system
+#             N100 - In the map showing the locations for calibration and prediction, all AirSensEUR and reference station sites with at least 0.0001 decimal degree of difference different 
+#                    are plotted with black circles and blue markers. THis can show the path in mobility when if will be needed or for calibration at multiple sites.
+#             N101 - In order to avoid the confusion with separator of longitude and latitude of the reference station, the coordinates are entered in 2 different text input, see "GetData"
+#              E59 - bug corection: In NavBarMenu "DataTreatment", mainTaPanel "PlotFiltering", the plots of Warming, Temp & Hmidity, Invalid and Outliers always used the date/time selected 
+#                                   for the first sensor, under "Range of dates for plotting outliers", whatever sensor being selected. Corrected
 #              
 #  ----#TO BE DONE  : ----
 # BUG CORRECTIONS
@@ -32,6 +43,7 @@
 #             E45 - The time zone used in the mainTabPanel "Plot Filtering" - "Invalid" - "Table" seems to use the local time zone instaed of the data series ime zone ("UTC") when discarding values.
 #             E49 - Add the between sampler uncertainty is the calculation of sensor uncertainty
 #             E50 - In "GetData" when changing sensor shield, the App start turning around excahnging shield file
+#             E60 - When calibrating NO2-B43F with a multilinear model including ExpGrowth of temperature and linear effect of humidity, the model fitting crash. IT is likely due to the startvalues
 #              
 # NEW FEATURES needed: ----
 #              N2 - Calibration with linear.robust: add RMSE on statterplot ...

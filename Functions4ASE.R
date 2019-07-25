@@ -209,17 +209,22 @@ ASEDigi2Volt <- function(Sensors_Cal, Digital, ADC = 16, Volt.Convert = TRUE) {
     
     # converts in Volts all variables
     if (Volt.Convert) {
-        MyMatrix    <- Digital[,] + 1
-        MyVectorMul <- 2*Sensors_Cal$RefAD/(2^ADC)
-        MyVectorAdd <- Sensors_Cal$Ref - Sensors_Cal$RefAD
-        Converted[,Sensors_Cal$name.sensor] <- t(t( t(t(MyMatrix) * MyVectorMul) ) + MyVectorAdd )
+        #MyMatrix    <- Digital[,] + 1
+        MyVectorMul  <- 2*Sensors_Cal$RefAD/(2^ADC)
+        MyVectorAdd  <- Sensors_Cal$Ref - Sensors_Cal$RefAD
+        Converted    <- t(t( t(t(Digital[,] + 1) * MyVectorMul) ) + MyVectorAdd )
+        
+        Converted    <- as.data.frame(Converted, stringsAsFactors = F)
+        colnames(Converted) <- Sensors_Cal$name.sensor
+        
     } else Converted[,Sensors_Cal$name.sensor] <- Digital
+    
     
     # converts in nA
     if (length(indexA) != 0) {
-        MyMatrix    <- Digital[,indexA] + 1
-        MyVectorMul <- 2*Sensors_Cal$RefAD[indexA]/(2^ADC)
-        MyVectorAdd <- Sensors_Cal$Ref[indexA] - Sensors_Cal$RefAD[indexA] - Sensors_Cal$board.zero.set[indexA]
+        #MyMatrix    <- Digital[,indexA] + 1
+        #MyVectorMul <- 2*Sensors_Cal$RefAD[indexA]/(2^ADC)
+        #MyVectorAdd <- Sensors_Cal$Ref[indexA] - Sensors_Cal$RefAD[indexA] - Sensors_Cal$board.zero.set[indexA]
         MyVectornA  <- 10^9/(Sensors_Cal$GAIN[indexA] * Sensors_Cal$Rload[indexA])
         # converting to a matrix
         matrix.Converted <- t(t(  t(apply(Converted[,Sensors_Cal$name.sensor[indexA]], 1 , function(x) x - Sensors_Cal$board.zero.set[indexA])) ) * MyVectornA) 
@@ -294,6 +299,7 @@ My.rm.Outliers <- function(date, y, ymin = NULL, ymax = NULL, ThresholdMin = NUL
     #                           : 2: always perpendicular to the axis and 3: always vertical.
     # Title                     : Charater vector, Title to be plotted
     # Ylab                      : The label of the y axis, a character vector, the default is "Raw Sensor values"
+    # Dygraphs              = logical, defaults is FALSE to plot a base plot. If TRUE use Dygraphs Dygraphs are plotted in UTC.
     
     # Return                = dataframe with Logical for low values, logical if value exceed lower MAD, logical if value exceed High MAD,
     #                         low MAD and high MAD
@@ -382,7 +388,8 @@ My.rm.Outliers <- function(date, y, ymin = NULL, ymax = NULL, ThresholdMin = NUL
                 dySeries("zmax",        label = names.data[7] , color = "grey",    drawPoints = FALSE) %>%
                 dySeries("zmin",        label = names.data[6] , color = "grey",    drawPoints = FALSE) %>%
                 dyLegend(show = "always", hideOnMouseOut = FALSE, width = 800) %>% 
-                dyRangeSelector()
+                dyRangeSelector() %>% 
+                dyOptions(labelsUTC = T) # plot in UTC
             
         } else {
             
@@ -403,7 +410,6 @@ My.rm.Outliers <- function(date, y, ymin = NULL, ymax = NULL, ThresholdMin = NUL
             dates  <- pretty(date, n = nTicksX)
             yticks <- pretty(y   , n = nTicksY)
             
-            #browser()
             plot(x = date , y = y, 
                  type = "p", 
                  lwd = 2, col = "green4", 
@@ -420,7 +426,6 @@ My.rm.Outliers <- function(date, y, ymin = NULL, ymax = NULL, ThresholdMin = NUL
             #Ylim <- format(seq(min(y, na.rm = TRUE), max(y, na.rm = TRUE), by = (max(y, na.rm = TRUE)-min(y, na.rm = TRUE))/10), scientific =FALSE, digits = 0)
             axis(2, at = yticks, srt = 45, las = LasY)
             abline(v = dates, h = yticks, col = "lightgray", lty = "dotted")
-            #browser()
             lines(df[df$date %in% intersect(date, df$date), "date"], df[which(df$date %in% intersect(date, df$date)),"zmax"], col = "Gray")
             points(date[which(df$OutliersMax)] , y[which(df$OutliersMax)], pch = 19, col = "black")
             lines(df[df$date %in% intersect(date, df$date), "date"], df[which(df$date %in% intersect(date, df$date)),"zmin"], col = "Gray")
@@ -456,7 +461,7 @@ My.rm.Outliers <- function(date, y, ymin = NULL, ymax = NULL, ThresholdMin = NUL
 #=====================================================================================CR
 GraphOut <- function(date , y, Col = "#E00000", Ylab = "Raw Sensor values", indfull, 
                      nTicksX = 10, nTicksY = 10, LasY = 3, Title = NULL, Dygraphs = FALSE)  {
-    # This function plot the data, show the ut() cutoffs, and mark the outliers:
+    # This function plot the data, show the ut() cutoffs, and mark the outliers. 
     # date                      : the time series date, a vector of POSIXCt
     # y                         : the y values to be plotted, a numeric vector
     # Col                       : The color of the time series, the default color is "#E00000"
@@ -467,6 +472,7 @@ GraphOut <- function(date , y, Col = "#E00000", Ylab = "Raw Sensor values", indf
     # LasY                      : integer, orientation of numbers on y axis> 0: always parallel to the axis [default], 1: always horizontal,
     #                           : 2: always perpendicular to the axis and 3: always vertical.
     # Title                     : Charater vector, Title to be plotted
+    # Dygraphs                  : logical, defaults is FALSE to plot a base plot. If TRUE use Dygraphs Dygraphs are plotted in UTC.
     
     if (Dygraphs) {
         if (class(indfull) == "integer") {
@@ -494,8 +500,8 @@ GraphOut <- function(date , y, Col = "#E00000", Ylab = "Raw Sensor values", indf
                 dySeries("Invalid" , label = "Invalid value"  , color = "red") %>%
                 dyOptions(drawPoints = TRUE, pointSize = 2) %>% 
                 dyLegend(show = "always", hideOnMouseOut = FALSE, width = 350) %>% 
-                dyRangeSelector()
-            #   dyOptions(useDataTimezone = TRUE) # do not use the local time zone
+                dyRangeSelector() %>% 
+                dyOptions(labelsUTC = T) # plot in UTC
             
         } else if (class(indfull) == "list") {
             
@@ -2274,14 +2280,16 @@ Sqlite2df <- function(name.SQLite, Dataset, Influx.TZ, UserMins = NULL, Download
     # Aggregating in tabulated form.
     i <- 0
     if (nrow(Values_db) < Page) Page <- nrow(Values_db)
-    while(i < nrow(Values_db)) {
+    while (i < nrow(Values_db)) {
         # Checking for a correct Page value for paging
-        if ((i + Page)> nrow(Values_db)) Page <- nrow(Values_db) - i
-        
-        cat(paste0("[SQLite2df] INFO, aggregating airsenseur.db in tabulated rows ", format(i+Page,scientific = FALSE),"/", nrow(Values_db)), sep = "\n" )
+        if ((i + Page) > nrow(Values_db)) Page <- nrow(Values_db) - i
+        #browser()
+        cat(paste0("[SQLite2df] INFO, aggregating airsenseur.db in tabulated rows ", format(i + Page, scientific = FALSE),"/", nrow(Values_db)), sep = "\n" )
         # casting data according to channel names
-        Buffer <- cast(Values_db[(i+1):(i+Page),], time + boardTimeStamp + gpsTimestamp + altitude + latitude + longitude  ~ Pollutants, 
-                       value = "sampleEvaluatedVal", fun.aggregate = 'mean' , fill = NA, na.rm = TRUE)
+        # Buffer <- cast(Values_db[(i + 1):(i + Page),], time + boardTimeStamp + gpsTimestamp + altitude + latitude + longitude  ~ Pollutants, 
+        #                value = "sampleEvaluatedVal", fun.aggregate = 'mean' , fill = NA, na.rm = TRUE)
+        Buffer <- spread(data = Values_db[(i + 1):(i + Page), c("time", "boardTimeStamp","gpsTimestamp", "altitude", "latitude", "longitude", "Pollutants", "sampleEvaluatedVal")], 
+                         key = Pollutants, value = sampleEvaluatedVal) %>% arrange(time)
         
         # aggregating in Values_db_cast
         # if (exists("Values_db_cast")) Values_db_cast <- rbind.fill(Values_db_cast, Buffer) else Values_db_cast <- Buffer
@@ -2292,7 +2300,7 @@ Sqlite2df <- function(name.SQLite, Dataset, Influx.TZ, UserMins = NULL, Download
     Values_db <- data.frame(Values_db_cast)
     
     #for (i in Channel.names$channel) colnames(Values_db)[which(colnames(Values_db) ==i)] <- Channel.names$Variables[which(Channel.names$channel == i)]
-    rm(Values_db_cast, Buffer)
+    remove(Values_db_cast, Buffer)
     remove(Sensor.names, Channel.names)
     remove(Meteo.names.change)
     
@@ -2321,7 +2329,7 @@ Sqlite2df <- function(name.SQLite, Dataset, Influx.TZ, UserMins = NULL, Download
         
         # we will have to wait UserMins mins to have new values
         i <- lubridate::floor_date(Values_db$date[1],  unit = paste0(toString(UserMins)," ","min"))
-        while(difftime(max(Values_db$date), i, units = "mins") > UserMins) {
+        while (difftime(max(Values_db$date), i, units = "mins") > UserMins) {
             
             cat(paste0("[SQLite2df] INFO, timeAverage of Values_db on ", i), sep = "\n" )
             SelectedRows    <- which(Values_db$date >= i & Values_db$date < i + 86400) # taking interval of one day in seconds
@@ -2334,8 +2342,8 @@ Sqlite2df <- function(name.SQLite, Dataset, Influx.TZ, UserMins = NULL, Download
                 # Adding boardTimesTamp afterwards
                 #browser()
                 Real.Sensors        <- colnames(Values_db)[!colnames(Values_db) %in% c("date","boardTimeStamp", "gpsTimestamp", "altitude", "latitude", "longitude")]
-                SelectedColumns     <- colnames(Values_db)[which(colnames(Values_db)!= "boardTimeStamp")]
-                SelectedRowsSensors <- as.numeric(row.names(Values_db[SelectedRows,])[as.vector(rowSums(!is.na(Values_db[SelectedRows, Real.Sensors])) >0)])
+                SelectedColumns     <- colnames(Values_db)[which(colnames(Values_db) != "boardTimeStamp")]
+                SelectedRowsSensors <- as.numeric(row.names(Values_db[SelectedRows,])[as.vector(rowSums(!is.na(Values_db[SelectedRows, Real.Sensors])) > 0)])
                 if (length(SelectedRowsSensors) > 0 ) {
                     
                     Buffer <- timeAverage( # selectByDate(Values_db, 
@@ -2452,7 +2460,7 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                      Ref__a_i_p__name = NULL, User__a_i_p__ = NULL, Pass__a_i_p__ = NULL, Ref__a_i_p__Organisation = NULL, 
                      Ref__a_i_p__Station = NULL, Ref__a_i_p__Pollutants = NULL, Ref__a_i_p__DateIN = NULL, Ref__a_i_p__DateEND = NULL,
                      
-                     csvFile = NULL, csvFile.sep = NULL, csvFile.quote = NULL, Old.Ref.Data = NULL, Coord.Ref = NULL, Ref.Type = "Ref") {
+                     csvFile = NULL, csvFile.sep = NULL, csvFile.quote = NULL, Old.Ref.Data = NULL, coord.ref = NULL, Ref.Type = "Ref") {
     
     # Reference.name        = Name of for Reference station
     # urlref                = Vector of URIs linking to csv files with the reference data. Frst row: header with variable names as in ASEConfig.R
@@ -2495,7 +2503,7 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
     # csvFile.sep           = if FTPMode = "csv", separator between columns in the csvFile
     # csvFile.quote         = if FTPMode = "csv", separator of values in all columns
     # Old.Ref.Data          = dataframe with previously loaded reference data to be merged with currently loading dataframe reference data, default is null, NULL
-    # Coord.Ref             = string with coordinates of reference data longitude and latitude separated by a blank
+    # coord.ref             = string with coordinates of reference data longitude and latitude separated by a blank
     # Ref.type              = label to be written in front of pollutatns names, defaut is Ref, other possibility Bine for PM distribution
     
     # return                = dataframe Ref with the data
@@ -2523,7 +2531,9 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                                    Ref.PM10    = c("PM10" , "Particulate matter < 10 µµm (aerosol)", "Ref.PM10"),
                                    Ref.PM2.5   = c("PM2.5", "Particulate matter < 2.5 µµm (aerosol)", "Ref.PM2.5"),
                                    Ref.CO_ppm  = c("CO"   , "Carbon monoxide (air)", "co", "Ref.CO_ppm", "CO_ppm", "carbon monoxide"),
-                                   Ref.Temp    = "Sample_air temperature") 
+                                   Ref.Temp    = c("Temperature", "Sample_air temperature"),
+                                   Ref.RH      = "Relative_humidity",
+                                   Ref.Press   = "Atmospheric_pressure") 
     
     # Downloading according to FTPMode
     if (FTPMode == "ftp" | FTPMode == "csv") {
@@ -2632,13 +2642,13 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                         # use openair function to aggregate to the selected time average, in openair time must be replaced in date
                         
                         # Adding coordinates of the reference stations
-                        if (!is.null(Coord.Ref)) {
+                        if (!is.null(coord.ref)) {
                             #browser()
-                            # taking coordinates from Coord.Ref
-                            long <- unlist(strsplit(x = Coord.Ref, split = ","))[1]
-                            lat  <- unlist(strsplit(x = Coord.Ref, split = ","))[2]
+                            # taking coordinates from coord.ref
+                            long <- unlist(strsplit(x = coord.ref, split = ","))[1]
+                            lat  <- unlist(strsplit(x = coord.ref, split = ","))[2]
                             
-                            if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = Coord.Ref))) {
+                            if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = coord.ref))) {
                                 
                                 # transform spherical coordinates to decimal degrees for later projection
                                 Ref.coord_d    <- OSMscale::degree(lat, long, digits = 5)
@@ -2750,35 +2760,53 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                 
                 if (file.exists(csvFile)) { #REMOVE THIS TEST, The FILE exists since it is selected
                     # browser()
-                    # if you load a .csv file:
                     if (grepl(".csv", csvFile, fixed = T)) {
-                    
-                    Reference.i <- read.csv(file        = csvFile,
-                                            header      = TRUE, 
-                                            na.strings  = naStrings,
-                                            sep         = csvFile.sep,
-                                            quote       = csvFile.quote,
-                                            check.names = FALSE,
-                                            stringsAsFactors = FALSE)
-                    }
-                    
-                    # if you load a .Rdata file:
-                    if (grepl(".Rdata", csvFile, fixed = T)) {
                         
+                        # if you load a .csv file:
+                        
+                        Reference.i <- read.csv(file        = csvFile,
+                                                header      = TRUE, 
+                                                na.strings  = naStrings,
+                                                sep         = csvFile.sep,
+                                                quote       = csvFile.quote,
+                                                check.names = FALSE,
+                                                stringsAsFactors = FALSE)
+                    } else if (grepl(".Rdata", csvFile, fixed = T)) {
+                        
+                        # if you load a .Rdata file:
                         # loaded Rdata with unknown name dataframe
-                        load(file = csvFile)
-                        
-                        # name of loaded dataframe
-                        Reference.i <- load(csvFile)
-                        Reference.i <- get(Reference.i)
+                        # see https://stackoverflow.com/questions/2520780/determining-name-of-object-loaded-in-r
+                        temp.space <- new.env()
+                        Reference.i <- load(file = csvFile, envir = temp.space)
+                        Reference.i <- get(Reference.i, envir = temp.space)
+                        rm(temp.space)
                         
                         # removing un-necessary columns of Reference.i
                         # possible names 
                         all.names <- character(0)
                         for (i in seq_along(Reference.names)) all.names <- c(all.names, unlist(Reference.names[[i]]))
-                        Reference.i <- Reference.i[,which(names(gas.RefData) %in% all.names)]
+                        Reference.i <- Reference.i[,which(names(Reference.i) %in% all.names)]
                         
-                    }
+                    } else {
+                        
+                        my_message <- paste0("[Down_Ref()] ERROR, unrecognized file type for \n
+                                               reference data .\n")
+                        cat(my_message)
+                        shinyalert(
+                            title = "ERROR unrecognised file type",
+                            text = my_message,
+                            closeOnEsc = TRUE,
+                            closeOnClickOutside = TRUE,
+                            html = FALSE,
+                            type = "error",
+                            showConfirmButton = TRUE,
+                            showCancelButton  = FALSE,
+                            confirmButtonText = "OK",
+                            confirmButtonCol  = "#AEDEF4",
+                            timer             = 0,
+                            imageUrl          = "",
+                            animation         = FALSE)
+                    } 
  
                     # if you load a GRIMM .txt file
                     if (grepl(".txt", csvFile, fixed = T) & Ref.Type == "GRIMM") {
@@ -2861,13 +2889,13 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                         }
                         
                         # Adding coordinates of the reference stations
-                        if (!is.null(Coord.Ref)) {
+                        if (!is.null(coord.ref)) {
                             
-                            # taking coordinates from Coord.Ref
-                            long <- unlist(strsplit(x = Coord.Ref, split = ","))[1]
-                            lat  <- unlist(strsplit(x = Coord.Ref, split = ","))[2]
+                            # taking coordinates from coord.ref
+                            long <- unlist(strsplit(x = coord.ref, split = ","))[1]
+                            lat  <- unlist(strsplit(x = coord.ref, split = ","))[2]
                             
-                            if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = Coord.Ref))) {
+                            if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = coord.ref))) {
                                 
                                 # transform spherical coordinates to decimal degrees for later projection
                                 Ref.coord_d    <- OSMscale::degree(lat, long, digits = 5)
@@ -3292,12 +3320,12 @@ Down_Ref <- function(Reference.name, urlref, UserMins, DownloadSensor, AirsensWe
                 
                 #browser()
                 # Adding coordinates of the reference stations
-                if (!is.null(Coord.Ref)) {
-                    # taking coordinates from Coord.Ref
-                    long <- unlist(strsplit(x = Coord.Ref, split = ","))[1]
-                    lat  <- unlist(strsplit(x = Coord.Ref, split = ","))[2]
+                if (!is.null(coord.ref)) {
+                    # taking coordinates from coord.ref
+                    long <- unlist(strsplit(x = coord.ref, split = ","))[1]
+                    lat  <- unlist(strsplit(x = coord.ref, split = ","))[2]
                     
-                    if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = Coord.Ref))) {
+                    if (any(grep(pattern = paste0(c("N","S", "E", "W", "d"), collapse = "|" ), x = coord.ref))) {
                         
                         # transform spherical coordinates to decimal degrees for later projection
                         Ref.coord_d    <- OSMscale::degree(lat, long, digits = 5)
@@ -4277,7 +4305,7 @@ REF      <- function(DownloadSensor, AirsensEur.name, DisqueFieldtestDir, UserMi
                      Ref.SOS.name = NULL, RefSOSname = NULL, RefSOSDateIN = NULL, RefSOSDateEND = NULL,
                      Ref__a_i_p__name = NULL, User__a_i_p__ = NULL, Pass__a_i_p__ = NULL, Ref__a_i_p__Organisation = NULL, 
                      Ref__a_i_p__Station = NULL, Ref__a_i_p__Pollutants = NULL, Ref__a_i_p__DateIN = NULL, Ref__a_i_p__DateEND = NULL,
-                     csvFile = NULL, csvFile.sep = NULL, csvFile.quote = NULL, Coord.Ref = NULL,
+                     csvFile = NULL, csvFile.sep = NULL, csvFile.quote = NULL, coord.ref = NULL,
                      Ref.Type = "Ref") {
     # DownloadSensor        = Output of function DownloadSensor()
     # Down.ref              = logical, if true reference data are downloaded
@@ -4301,7 +4329,7 @@ REF      <- function(DownloadSensor, AirsensEur.name, DisqueFieldtestDir, UserMi
     # csvFile               = if FTPMode = "csv", file path to the csv file to load
     # csvFile.sep           = if FTPMode = "csv", separator between columns in the csvFile
     # csvFile.quote         = if FTPMode = "csv", separator of values in all columns
-    # Coord.Ref             = string with coordinates of reference data longitude and latitude separated by a blank
+    # coord.ref             = string with coordinates of reference data longitude and latitude separated by a blank
     # Ref.type              = label to be written in front of pollutatns names, defaut is Ref, other possibility Bin.APS and Bin.DMPS for PM distribution
     
     #------------------------------------------------------------------------------CR
@@ -4340,7 +4368,7 @@ REF      <- function(DownloadSensor, AirsensEur.name, DisqueFieldtestDir, UserMi
                              Ref__a_i_p__Organisation = Ref__a_i_p__Organisation, Ref__a_i_p__Station = Ref__a_i_p__Station, 
                              Ref__a_i_p__Pollutants = Ref__a_i_p__Pollutants, Ref__a_i_p__DateIN = Ref__a_i_p__DateIN, Ref__a_i_p__DateEND = Ref__a_i_p__DateEND,
                              
-                             csvFile = csvFile, csvFile.sep = csvFile.sep, csvFile.quote = csvFile.quote, Coord.Ref = trimws(x = Coord.Ref), Ref.Type = Ref.Type) # this return only new Data
+                             csvFile = csvFile, csvFile.sep = csvFile.sep, csvFile.quote = csvFile.quote, coord.ref = trimws(x = coord.ref), Ref.Type = Ref.Type) # this return only new Data
             
         # setting the name of sensors
         if (exists("RefData") && !is.null(RefData)) {
