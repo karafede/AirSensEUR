@@ -23,13 +23,19 @@
 #              N98 - bug corection: Added message to keep UTC time zone when downloading sensor data using InfluxDB uner NavbarMenu "Getdata", tab "Sensor Data".
 #              E58 - bug corection: When plotting a time series using Dygraphs, the last selected day was excluded from computation and plotting as selection returned a type Date 
 #                                   without time values. Corrected adding one day to the last selected date. All dygraph time series plots used the local time zone. Now set to UTC.
-#              N99 - Checking if R runs in 32-bist system advising to switch to a 64-bit system
+#              N99 - Checking if R runs in 32-bist system, advising to switch to a 64-bit system
 #             N100 - In the map showing the locations for calibration and prediction, all AirSensEUR and reference station sites with at least 0.0001 decimal degree of difference different 
 #                    are plotted with black circles and blue markers. THis can show the path in mobility when if will be needed or for calibration at multiple sites.
 #             N101 - In order to avoid the confusion with separator of longitude and latitude of the reference station, the coordinates are entered in 2 different text input, see "GetData"
 #              E59 - bug corection: In NavBarMenu "DataTreatment", mainTaPanel "PlotFiltering", the plots of Warming, Temp & Hmidity, Invalid and Outliers always used the date/time selected 
-#                                   for the first sensor, under "Range of dates for plotting outliers", whatever sensor being selected. Corrected
-#              
+#                                   for the first sensor, under "Range of dates for plotting outliers", whatever sensor being selected. Corrected: now the Range of dates for plotting outliers
+#                                   is selected for each sensor.
+#             N102 - The speed of the code for averaging dataframe from minute to 
+#              E61 - Bug correction solved: crash when CovMod Config file is empty. Solved using read_csv instead of read.csv
+#              E62 - When the last date of General.Rdata ends before the last date of Refdata without any Influx Data available for the new dates in RefData, the recative GENERAL function is triggered
+#                    GENERAL is run and the resulting dataframe General.df does not include the outliers columns yet. Consequently the Outliers discarding module is run at each startup. 
+#                    This is now solved by using all.equal instead of identical and comparing only common colums of saved Genera.Rdata files and the reurned dataframe of function GENERAL.
+#                    
 #  ----#TO BE DONE  : ----
 # BUG CORRECTIONS
 #              E4 - It seems that the detection of directory from where the script is run detected using function Script_Dir() does not allways works, it should be made it transparent for user

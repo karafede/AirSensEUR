@@ -2759,3 +2759,56 @@ get_Coord.Ref  <- function(Coordinates.chr, ShinyUpdate = False, session = NULL,
         return(paste0(NA,NA))
     } 
 }
+
+#================================================================CR
+# Aggreation of time series in dataframe
+#================================================================CR
+DF_avg <- function(DF, Cols.for.Avg = NULL, width = 60) { 
+    # Use fastest RcppRoll::roll_mean to average a data frame
+    # DF            : dataframe to be aggregated, shall include the PosixCT column "date"
+    # Cols.for.Avg  : vector of charaters, default NULL. If not NULL the returned columns Cols.for.Avg + "date" is returned
+    # width         : numeric, default is 60. Size of the window used for averaging
+    # 
+    # return        : aggregated dataframe (tibble) starting on the first full hour discarding empty rows and transforming nan to na
+
+    # Previous code with timeAverage
+    # Init.DF.avg <- data.frame(timeAverage(mydata     = DF$General[,Cols.for.Avg], 
+    #                                       avg.time   = paste0(toString(input$UserMinsAvg)," ","min"), 
+    #                                       statistic  = "mean", 
+    #                                       start.date = round(min(DF$General$date, na.rm = TRUE), units = "hours"), 
+    #                                       end.date   = round(max(DF$General$date, na.rm = TRUE), units = "hours")))
+    # Init.DF.avg[] <- lapply(Init.DF.avg, nan.to.na)
+    # DF$General$Breaks <- cut(DF$General$date, breaks = paste0(toString(input$UserMinsAvg)," ","min")) %>% ymd_hms
+    # Init.DF.avg <- DF$General[,Cols.for.Avg] %>% dplyr::select(-date,-date_PreDelay) %>% group_by(Breaks) %>%  summarise_all(funs(mean))
+    # aggregate(DF$General[,-grep(pattern ="date", x = names(DF$General))], by = list(DF$General$Breaks), mean)
+    
+    # checking the size of window, at lest two times the width
+    if (nrow(DF) > width * 2) {
+        
+        # Select columns
+        if (!is.null(Cols.for.Avg)) DF <- DF[,c("date", Cols.for.Avg)]
+        
+        # makes complete row of times series
+        DF <- DF %>%
+            tidyr::complete(date = seq(round(min(date, na.rm = TRUE), units = "hours"), 
+                                       round(max(date, na.rm = TRUE), units = "hours"), width)) %>% 
+            filter(date >= round(min(date, na.rm = TRUE), units = "hours"))
+        
+        # Aggregating using the mean with window size 
+        DF.avg   <- DF
+        DF.avg[, -which(names(DF) == "date")] <- lapply(DF[, -which(names(DF) == "date")], function(x) RcppRoll::roll_mean(x , n = width, na.rm = TRUE, by = width, fill = NA, align = "left"))
+        #DF.avg$date <- DF$date
+        DF.avg   <- DF.avg[seq(1, nrow(DF.avg), width),] 
+        DF.avg[] <- lapply(DF.avg, nan.to.na)
+        rm(DF)
+        
+        # discarding rows with all NAs added to complete the minute time series
+        Index.DF.avg   <- which(sapply(seq_along(DF.avg$date), function(i) all(is.na(DF.avg[i, -which(names(DF.avg) == "date")]))))
+        if (length(Index.DF.avg) > 0 ) DF.avg <- DF.avg[-Index.DF.avg,]
+        
+        return(data.frame(DF.avg))
+        
+    } else cat("[ts_avg] ERROR, the selected dataframe is too short for averaging")
+} 
+
+
